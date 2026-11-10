@@ -1,0 +1,941 @@
+<title>Earth Casebook</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;600;700&display=swap">
+<style>
+/* Layout: mission console. The Earth stays in view on the left; a guided four-step investigation runs on the right. Single dark "night side of Earth" look, chosen on purpose. */
+:root{
+  color-scheme:dark;
+  --space:#060A15; --bg:#0A1122; --panel:#0F1930; --panel2:#15223D; --line:#22324F;
+  --ink:#EAF0FA; --muted:#8E9BB5; --gold:#F5C451; --heat:#FF4B3A; --cool:#3DB2FF; --wind:#B49CFF; --ok:#5BD08B; --bad:#FF7468;
+  --f-display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --f-body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--space);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--space)}
+a{color:var(--gold)}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.label{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+h1,h2,h3,h4{font-family:var(--f-display);font-weight:800;letter-spacing:.01em;text-wrap:balance;margin:0;line-height:1;text-transform:uppercase}
+p{margin:0}
+[hidden]{display:none!important}
+
+/* top bar */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--space);display:flex;flex-wrap:wrap;gap:10px 24px;align-items:center;justify-content:space-between;padding-block:12px;border-bottom:1px solid var(--line);max-width:1400px;margin:0 auto}
+.brand{display:flex;align-items:baseline;gap:12px}
+.brand h1{font-size:30px}
+.brand h1 span{color:var(--gold)}
+.steps{display:flex;gap:4px;flex-wrap:wrap}
+.steps button{display:flex;align-items:center;gap:8px;border:1px solid transparent;background:none;padding:7px 12px 7px 8px;border-radius:999px;cursor:pointer;color:var(--muted);font-size:13.5px}
+.steps button .n{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);font-family:var(--f-mono);font-size:11px}
+.steps button[aria-current="step"]{color:var(--ink);border-color:var(--line);background:var(--panel)}
+.steps button[aria-current="step"] .n{background:var(--gold);border-color:var(--gold);color:var(--space);font-weight:600}
+.steps button.done .n{border-color:var(--gold);color:var(--gold)}
+.who{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.who button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 12px;cursor:pointer;color:var(--ink)}
+
+/* console layout */
+.console{max-width:1400px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,1fr);gap:24px;padding-block:18px 40px}
+.console.wide{grid-template-columns:minmax(0,1fr)}
+.console.wide .earth{display:none}
+@media (max-width:980px){.console{grid-template-columns:minmax(0,1fr)}}
+.earth{position:sticky;top:calc(env(safe-area-inset-top,0px) + 70px);align-self:start;display:flex;flex-direction:column;gap:10px;min-width:0}
+@media (max-width:980px){.earth{position:relative;top:0}}
+.stage{position:relative;width:100%;aspect-ratio:1/1;max-height:calc(100vh - 210px);border-radius:14px;overflow:hidden;touch-action:none;cursor:grab;
+  background:radial-gradient(ellipse at 50% 45%,#0F1E3D 0%,var(--space) 70%)}
+@media (max-width:980px){.stage{max-height:none;aspect-ratio:1/0.92}}
+.stage:active{cursor:grabbing}
+.stars{position:absolute;inset:0;pointer-events:none}
+#gl{position:absolute;inset:0;width:100%;height:100%;display:block}
+.chip{position:absolute;left:14px;top:14px;display:flex;flex-direction:column;gap:2px;pointer-events:none;max-width:70%}
+.chip .big{font-family:var(--f-display);font-weight:800;font-size:clamp(30px,4.4vw,46px);line-height:1;text-transform:uppercase}
+.chip .sub{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);letter-spacing:.05em}
+.imgbadge{position:absolute;right:12px;top:12px;font-family:var(--f-mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:4px 8px;border-radius:999px;border:1px solid var(--line);background:rgba(6,10,21,.7);color:var(--muted);pointer-events:none}
+.tip{position:absolute;pointer-events:none;background:rgba(6,10,21,.92);border:1px solid var(--line);padding:6px 10px;border-radius:6px;font-size:12.5px;white-space:nowrap;transform:translate(12px,-50%)}
+.legend{position:absolute;left:14px;bottom:12px;right:14px;display:flex;align-items:end;justify-content:space-between;gap:10px;pointer-events:none}
+.legend .bar{height:7px;width:160px;max-width:40vw;border-radius:2px}
+.legend .ends{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:10.5px;color:var(--muted);margin-top:3px}
+.zoom{display:flex;flex-direction:column;gap:6px;pointer-events:auto}
+.zoom button{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:rgba(15,25,48,.85);cursor:pointer;font-size:18px;line-height:1}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;padding:3px;background:var(--bg);gap:2px}
+.seg button{border:0;background:none;padding:6px 11px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--muted);display:inline-flex;gap:6px;align-items:center}
+.seg button i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.seg button[aria-pressed="true"]{background:var(--panel2);color:var(--ink)}
+.timebar{display:flex;gap:10px;align-items:center}
+.timebar input{flex:1;min-width:0;accent-color:var(--heat)}
+.timebar .mono{font-size:13px;min-width:4ch}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);background:var(--panel);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13.5px;font-weight:600;color:var(--ink)}
+.btn:hover{border-color:var(--muted)}
+.btn.gold{background:var(--gold);border-color:var(--gold);color:var(--space)}
+.btn.gold:hover{filter:brightness(1.06)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.hint{font-size:12.5px;color:var(--muted)}
+
+/* panels */
+.panel{display:flex;flex-direction:column;gap:18px;min-width:0}
+.guide{display:flex;gap:14px;align-items:flex-start;border:1px solid var(--line);background:linear-gradient(180deg,var(--panel),var(--bg));border-radius:12px;padding:14px 16px}
+.guide .n{font-family:var(--f-display);font-weight:800;font-size:42px;line-height:.9;color:var(--gold)}
+.guide h2{font-size:28px}
+.guide p{color:var(--muted);font-size:14px;margin-top:4px;max-width:62ch}
+.hello{font-size:15px}
+.hello b{color:var(--gold)}
+.card{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card-head{display:flex;justify-content:space-between;align-items:start;gap:10px;flex-wrap:wrap}
+.card-head h3{font-size:24px}
+.card-head h3 i{font-style:normal;color:var(--muted);font-size:15px;font-family:var(--f-mono);font-weight:400;text-transform:none;letter-spacing:0;margin-left:6px}
+.badges{display:flex;gap:6px;flex-wrap:wrap}
+.badge{font-family:var(--f-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.badge.real{color:var(--ok)} .badge.live{color:var(--cool)} .badge.est{color:var(--gold)} .badge.anch{color:var(--wind)}
+.nums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:520px){.nums{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.nums div{border-top:1px solid var(--line);padding-top:6px;min-width:0}
+.nums .v{font-family:var(--f-display);font-weight:800;font-size:30px;line-height:1.05}
+.nums .k{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.up{color:var(--heat)} .down{color:var(--cool)} .flat{color:var(--muted)}
+.card svg{width:100%;height:auto;display:block}
+.verdict{font-size:14px}
+.verdict b{color:var(--ink)}
+.advice{border-top:1px dashed var(--line);padding-top:10px}
+.advice h4{font-size:16px;color:var(--gold);margin-bottom:6px;letter-spacing:.04em}
+.advice ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:14px}
+.factor-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.factor-tabs button{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer;display:inline-flex;gap:7px;align-items:center;color:var(--muted)}
+.factor-tabs button i{width:8px;height:8px;border-radius:50%}
+.factor-tabs button[aria-selected="true"]{border-color:var(--ink);color:var(--ink);background:var(--panel2)}
+.headline{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:radial-gradient(circle at 100% 0%,rgba(255,75,58,.16),transparent 60%),var(--panel)}
+.headline .big{font-family:var(--f-display);font-weight:800;font-size:clamp(30px,4vw,44px);line-height:1.02;text-transform:uppercase;color:var(--ink)}
+.headline .big em{font-style:normal;color:var(--heat)}
+.headline p{color:var(--muted);font-size:14px;margin-top:6px}
+.next{display:flex;justify-content:flex-end}
+.pledge{display:flex;flex-direction:column;gap:8px}
+.pledge label{display:flex;gap:10px;align-items:flex-start;font-size:14px;cursor:pointer;border:1px solid var(--line);border-radius:8px;padding:9px 11px;background:var(--bg)}
+.pledge input{accent-color:var(--gold);margin-top:3px}
+
+/* case file */
+.tabs{display:flex;flex-wrap:wrap;gap:6px}
+.tabs button{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer;color:var(--muted)}
+.tabs button[aria-selected="true"]{border-color:var(--gold);color:var(--ink);background:var(--panel2)}
+.stamp{font-family:var(--f-display);font-weight:800;font-size:15px;letter-spacing:.06em;text-transform:uppercase;padding:3px 10px;border:2px solid currentColor;border-radius:4px;transform:rotate(-3deg);white-space:nowrap}
+.stamp.yes{color:var(--heat)} .stamp.no{color:var(--muted)}
+.facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 18px;margin:0}
+@media (max-width:520px){.facts{grid-template-columns:minmax(0,1fr)}}
+.facts div{border-top:1px solid var(--line);padding-top:6px;min-width:0}
+.facts dt{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.facts dd{margin:2px 0 0;font-size:14px}
+.facts dd.big{font-family:var(--f-mono);font-size:16px;font-weight:500}
+.windowbox{display:flex;flex-direction:column;gap:6px;border:1px dashed var(--line);border-radius:8px;padding:10px 12px}
+.windowbox .timebar label{font-size:13px;white-space:nowrap}
+.alarm{font-size:13px;color:var(--muted)}
+.alarm.warn{color:var(--bad);font-weight:600}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.score{font-size:13.5px;color:var(--muted)}
+.score b{color:var(--gold);font-family:var(--f-mono)}
+.src{font-size:12.5px;color:var(--muted)}
+
+/* lab */
+.twin{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+@media (max-width:640px){.twin{grid-template-columns:minmax(0,1fr)}}
+.twin-card{min-width:0;display:flex;flex-direction:column;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.twin-card .t{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.twin-card .t b{font-size:14.5px}
+.twin-card .rate{font-family:var(--f-mono);font-size:13.5px;font-weight:500;white-space:nowrap}
+.driver{font-size:14px}
+.driver b{color:var(--gold)}
+.flip{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:13px}
+.flip input{accent-color:var(--gold);width:200px;max-width:100%}
+.board{position:relative;border:1px solid var(--line);border-radius:12px;background:radial-gradient(circle at 1px 1px,var(--line) 1px,transparent 1.5px) 0 0/18px 18px,var(--bg);
+  padding:20px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:30px 18px;min-width:0}
+@media (max-width:560px){.board{grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 12px;padding:14px}}
+.board svg.strings{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:2}
+.clue{position:relative;z-index:1;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:10px 10px 12px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:3px;min-width:0;color:var(--ink)}
+.clue:nth-child(odd){transform:rotate(-1.2deg)} .clue:nth-child(even){transform:rotate(1deg)}
+.clue b{font-size:14px;line-height:1.25}
+.clue small{font-size:12px;color:var(--muted)}
+.clue .arrow{font-family:var(--f-mono);font-size:18px;line-height:1}
+.clue[aria-pressed="true"]{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold)}
+.log{display:flex;flex-direction:column;gap:10px;max-height:300px;overflow:auto}
+.log div{border-left:3px solid var(--line);padding:2px 0 2px 10px;font-size:13.5px}
+.log div.ok{border-color:var(--ok)} .log div.no{border-color:var(--bad)}
+.log div b{display:block;font-size:13px}
+.log div.ok b{color:var(--ok)} .log div.no b{color:var(--bad)}
+.count{font-family:var(--f-display);font-weight:800;font-size:40px;line-height:1}
+
+/* data */
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{text-align:left;padding:8px 10px 8px 0;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:400}
+ol.steps-list{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:7px;font-size:14px}
+code{font-family:var(--f-mono);font-size:12.5px;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:1px 5px;word-break:break-all}
+
+/* onboarding */
+.modal{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:16px;background:rgba(4,7,15,.72);backdrop-filter:blur(6px)}
+.sheet{width:min(560px,100%);max-height:calc(100% - 20px);overflow:auto;background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:16px;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.sheet h2{font-size:clamp(32px,6vw,44px)}
+.sheet h2 span{color:var(--gold)}
+.sheet p{color:var(--muted)}
+.dots{display:flex;gap:6px}
+.dots i{width:28px;height:4px;border-radius:2px;background:var(--line)}
+.dots i.on{background:var(--gold)}
+.field{display:flex;flex-direction:column;gap:6px}
+.field input{padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel);font-size:17px}
+.field input:focus{border-color:var(--gold);outline:none}
+.sugg{display:flex;flex-direction:column;gap:2px;max-height:210px;overflow:auto}
+.sugg button{text-align:left;border:0;background:none;padding:8px 10px;border-radius:8px;cursor:pointer;color:var(--ink);font-size:14.5px}
+.sugg button:hover,.sugg button:focus-visible{background:var(--panel2)}
+.quick{display:flex;flex-wrap:wrap;gap:6px}
+.quick button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 12px;cursor:pointer;font-size:13px;color:var(--ink)}
+.quick button[aria-pressed="true"]{border-color:var(--gold);color:var(--gold)}
+.sheet .row{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.err{color:var(--bad);font-size:13px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<!-- ONBOARDING -->
+<div class="modal" id="onb" role="dialog" aria-modal="true" aria-labelledby="onbTitle">
+  <div class="sheet">
+    <div class="dots" aria-hidden="true"><i id="d1" class="on"></i><i id="d2"></i><i id="d3"></i></div>
+    <section id="s1" class="field" style="gap:14px">
+      <span class="label">NASA Space Apps 2026 · Earth System Trend Detective</span>
+      <h2 id="onbTitle">Welcome, <span>detective.</span></h2>
+      <p>You'll investigate how one place on Earth has changed since 1981, where it's heading by 2050, and what you can do about it. It takes about three minutes.</p>
+      <label class="label" for="nameIn">What should we call you?</label>
+      <input id="nameIn" autocomplete="given-name" placeholder="Your first name" maxlength="30">
+      <div class="row"><span class="hint">Your name stays in this browser.</span><button class="btn gold" id="go1" type="button">Next →</button></div>
+      <p class="err" id="bootErr" hidden></p>
+    </section>
+    <section id="s2" class="field" hidden style="gap:12px">
+      <span class="label">Step 2 of 3</span>
+      <h2>Which place should we <span>investigate</span>?</h2>
+      <p>Pick your country, or any country you care about. You can change it later.</p>
+      <input id="placeIn" placeholder="Type a country, e.g. Egypt" autocomplete="off" aria-controls="sugg">
+      <div class="sugg" id="sugg" role="listbox"></div>
+      <div class="quick" id="quick"></div>
+      <div class="row"><button class="btn" id="back2">← Back</button><button class="btn gold" id="go2" disabled>Next →</button></div>
+    </section>
+    <section id="s3" class="field" hidden style="gap:12px">
+      <span class="label">Step 3 of 3 · optional</span>
+      <h2>When were you <span>born</span>?</h2>
+      <p>We'll show what changed in your place during your lifetime. Skip it and we'll use 1981, when NASA's local records start.</p>
+      <input id="birthIn" type="number" min="1930" max="2022" placeholder="e.g. 2006" inputmode="numeric">
+      <p class="err" id="birthErr" hidden>Enter a year between 1930 and 2022, or leave it empty.</p>
+      <div class="row"><button class="btn" id="back3">← Back</button><button class="btn gold" id="go3">Open my case file</button></div>
+    </section>
+  </div>
+</div>
+
+<script>
+/* Runs before any library loads: the Next button and an error readout never depend on the rest of the page. */
+(function(){
+  function showErr(msg){var b=document.getElementById("bootErr");if(b){b.hidden=false;b.textContent="Part of the page didn't load ("+msg+"). Please send this message to the team.";}}
+  window.addEventListener("error",function(e){if(e&&e.message)showErr(e.message);});
+  window.addEventListener("unhandledrejection",function(e){showErr(String(e&&e.reason&&e.reason.message||e.reason||"unknown"));});
+  document.addEventListener("click",function(e){
+    var t=e.target&&e.target.closest?e.target.closest("#go1"):null;if(!t)return;
+    var n=document.getElementById("nameIn");window.__ecbName=((n&&n.value)||"").trim().slice(0,30)||"Detective";
+    [1,2,3].forEach(function(i){var s=document.getElementById("s"+i),d=document.getElementById("d"+i);if(s)s.hidden=i!==2;if(d)d.classList.toggle("on",i<=2);});
+    setTimeout(function(){var p=document.getElementById("placeIn");if(p)p.focus();},30);
+  });
+})();
+</script>
+<header class="top">
+  <div class="brand"><h1>Earth <span>Casebook</span></h1></div>
+  <nav class="steps" aria-label="Investigation steps">
+    <button data-step="place" aria-current="step"><span class="n">1</span>Your place</button>
+    <button data-step="planet"><span class="n">2</span>The planet</button>
+    <button data-step="lab"><span class="n">3</span>Detective lab</button>
+    <button data-step="data"><span class="n">4</span>Data &amp; sources</button>
+  </nav>
+  <div class="who"><span id="whoTxt"></span><button id="editMe">Change</button></div>
+</header>
+
+<main class="console" id="console">
+  <!-- EARTH -->
+  <div class="earth">
+    <div class="stage" id="stage">
+      <canvas class="stars" id="stars" aria-hidden="true"></canvas>
+      <canvas id="gl" aria-label="3D Earth. Drag to rotate, scroll or pinch to zoom, tap a country to investigate it."></canvas>
+      <div class="chip"><span class="big" id="chipBig">—</span><span class="sub" id="chipSub"></span></div>
+      <span class="imgbadge" id="imgBadge">Earth texture</span>
+      <div class="tip" id="tip" hidden></div>
+      <div class="legend"><div><div class="bar" id="legBar"></div><div class="ends"><span id="legLo"></span><span id="legHi"></span></div></div>
+        <div class="zoom"><button id="zIn" aria-label="Zoom in">+</button><button id="zOut" aria-label="Zoom out">−</button></div></div>
+    </div>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Map layer">
+        <button data-layer="heat" aria-pressed="true"><i style="background:var(--heat)"></i>Warming</button>
+        <button data-layer="rain" aria-pressed="false"><i style="background:var(--cool)"></i>Rainfall</button>
+        <button data-layer="wind" aria-pressed="false"><i style="background:var(--wind)"></i>Wind</button>
+        <button data-layer="natural" aria-pressed="false"><i style="background:#5C8A4A"></i>Natural</button>
+      </div>
+      <span class="hint">Drag · scroll to zoom · tap a country</span>
+    </div>
+    <div class="timebar"><button class="btn" id="play">▶ Play</button><input type="range" id="year" min="1950" max="2025" value="2025" aria-label="Map year"><span class="mono" id="yearTxt">2025</span></div>
+  </div>
+
+  <!-- STEP 1: PLACE -->
+  <section class="panel" id="p-place">
+    <div class="guide"><span class="n">1</span><div><h2>Your place</h2><p>What changed where you live, whether the change is real, where it's heading by 2050, and what you can do. Switch factors with the buttons below.</p></div></div>
+    <p class="hello" id="hello"></p>
+    <div class="headline" id="headline"></div>
+    <div class="factor-tabs" role="tablist" id="ftabs"></div>
+    <div class="card" id="fcard"></div>
+    <div class="card">
+      <div class="card-head"><h3>Your pledge</h3><span class="label" id="pledgeCount">0 chosen</span></div>
+      <p class="hint">Tick what you'll actually do this year. These are picked from the trends in your place.</p>
+      <div class="pledge" id="pledge"></div>
+    </div>
+    <div class="next"><button class="btn gold" data-goto="planet">Next: the whole planet →</button></div>
+  </section>
+
+  <!-- STEP 2: PLANET -->
+  <section class="panel" id="p-planet" hidden>
+    <div class="guide"><span class="n">2</span><div><h2>The planet</h2><p>Five global case files from NASA and NOAA records. Each verdict is computed live. Try "Predict before you look", move the start year to test the evidence, or listen to the data.</p></div></div>
+    <div class="card">
+      <div class="tabs" role="tablist" id="ctabs"></div>
+      <div class="card-head"><div><span class="label" id="cNo"></span><h3 id="cTitle"></h3></div><span class="stamp" id="stamp"></span></div>
+      <div class="badges" id="cBadges"></div>
+      <svg id="chart" viewBox="0 0 640 300" role="img" aria-label="Case chart" style="touch-action:none"></svg>
+      <dl class="facts">
+        <div><dt>What is changing</dt><dd id="fWhat"></dd></div>
+        <div><dt>Where</dt><dd id="fWhere"></dd></div>
+        <div><dt>How fast</dt><dd class="big" id="fRate"></dd></div>
+        <div><dt>Signal left the noise</dt><dd class="big" id="fToe"></dd></div>
+        <div><dt>Is it real?</dt><dd id="fReal"></dd></div>
+        <div><dt>Forecast for 2050</dt><dd class="big" id="fFore"></dd></div>
+      </dl>
+      <div class="windowbox"><div class="timebar"><label for="win">Start the clock in <b class="mono" id="winYear"></b></label><input type="range" id="win"></div><p class="alarm" id="alarm"></p></div>
+      <div class="actions">
+        <button class="btn gold" id="predictBtn">✎ Predict before you look</button>
+        <button class="btn" id="revealBtn" hidden>Reveal the data</button>
+        <button class="btn" id="listenBtn">♪ Listen</button>
+        <span class="score" id="score" aria-live="polite"></span>
+      </div>
+      <p class="src" id="cSrc"></p>
+    </div>
+    <div class="next"><button class="btn gold" data-goto="lab">Next: detective lab →</button></div>
+  </section>
+
+  <!-- STEP 3: LAB -->
+  <section class="panel" id="p-lab" hidden>
+    <div class="guide"><span class="n">3</span><div><h2>Detective lab</h2><p>Two puzzles. First, opposite twins: one cause leaves opposite trends in different places. Then the evidence board: connect causes to effects and avoid the trap.</p></div></div>
+    <div class="card"><div class="card-head"><h3>Opposite twins</h3><span class="badge est">Illustrative series</span></div><div id="twins" style="display:flex;flex-direction:column;gap:26px"></div></div>
+    <div class="card">
+      <div class="card-head"><h3>Evidence board</h3><div><span class="label">Links pinned</span> <span class="count"><span id="linkCount">0</span>/7</span></div></div>
+      <p class="hint" id="pick">Tap the clue that does the driving, then the clue it drives.</p>
+      <div class="board" id="board"><svg class="strings" id="strings" aria-hidden="true"></svg></div>
+      <div class="log" id="log" aria-live="polite"></div>
+      <div><button class="btn" id="boardReset">Clear the board</button></div>
+    </div>
+    <div class="next"><button class="btn gold" data-goto="data">Next: data &amp; sources →</button></div>
+  </section>
+
+  <!-- STEP 4: DATA -->
+  <section class="panel" id="p-data" hidden>
+    <div class="guide"><span class="n">4</span><div><h2>Data &amp; sources</h2><p>Every series carries a badge so nobody mistakes an estimate for a measurement.</p></div></div>
+    <div class="card">
+      <h3>What the badges mean</h3>
+      <div class="tbl"><table><tbody>
+        <tr><td><span class="badge real">Real data</span></td><td>Downloaded from the agency's published file and embedded as-is.</td></tr>
+        <tr><td><span class="badge live">Live NASA</span></td><td>Fetched from the NASA POWER API for your exact location when the site runs on your own domain.</td></tr>
+        <tr><td><span class="badge anch">Anchored</span></td><td>A smooth curve fitted to NASA's published totals, because the yearly file needs an Earthdata login.</td></tr>
+        <tr><td><span class="badge est">Estimate</span></td><td>Derived from the global record with regional patterns from the scientific literature. Replaced by live data once deployed.</td></tr>
+      </tbody></table></div>
+    </div>
+    <div class="card">
+      <h3>Sources</h3>
+      <div class="tbl"><table><thead><tr><th>Series</th><th>Source</th><th>Status</th></tr></thead><tbody id="srcRows"></tbody></table></div>
+    </div>
+    <div class="card">
+      <h3>Going live on your own site</h3>
+      <ol class="steps-list">
+        <li><b>Real satellite Earth.</b> The globe already requests NASA's Blue Marble image from NASA GIBS. This preview's security sandbox blocks outside images, so you see a drawn Earth here. On Vercel or GitHub Pages the real image loads with no code change.</li>
+        <li><b>Real local data.</b> When you pick a place, the page calls the NASA POWER API for that point: temperature <code>T2M</code>, rainfall <code>PRECTOTCORR</code>, wind <code>WS10M</code>, 1981 to last year. If it answers, the Estimate badges flip to Live NASA.</li>
+        <li><b>Country borders</b> load from the open-source ECharts world map. If that fails, the globe falls back to a built-in outline.</li>
+        <li><b>Sea level and Greenland:</b> download the GMSL and Greenland mass files from NASA PO.DAAC (free Earthdata login) and paste the yearly values into the <code>SEA</code> and <code>GL</code> arrays.</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h3>How a trend gets confirmed</h3>
+      <ol class="steps-list">
+        <li><b>Sen's slope</b> gives the rate: the median of every pairwise slope, so one extreme year cannot drag it.</li>
+        <li><b>Mann-Kendall test</b> checks whether rises outnumber falls by more than chance. "Confirmed" needs p &lt; 0.05.</li>
+        <li><b>Time of emergence</b> is the first year the trend line leaves the ±2σ band of year-to-year noise.</li>
+        <li><b>Forecast</b> extends the last 25 years' rate to 2050, with a band that widens with distance. It is a trend extrapolation, not a climate model run.</li>
+        <li><b>Cherry-pick alarm</b> fires for windows under 15 years or when the start year flips the trend's sign.</li>
+      </ol>
+    </div>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ECharts world map registers itself via echarts.registerMap; we catch the geometry with a small stub. */
+window.__worldGeo=null;
+window.echarts={registerMap:function(name,geo){if(/world/i.test(name))window.__worldGeo=geo;}};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@4.9.0/map/js/world.js"></script>
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s),$$=s=>Array.from(document.querySelectorAll(s));
+const D=Math.PI/180;
+const range=(a,b)=>Array.from({length:b-a+1},(_,i)=>a+i);
+const store={get(k){try{return JSON.parse(localStorage.getItem("ecb_"+k));}catch(_){return null;}},set(k,v){try{localStorage.setItem("ecb_"+k,JSON.stringify(v));}catch(_){}}};
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function gauss(r){let u=0;while(!u)u=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*r());}
+function hash(s){let h=2166136261;for(const c of s){h^=c.charCodeAt(0);h=Math.imul(h,16777619);}return h>>>0;}
+function fmt(v,d){if(v==null||isNaN(v))return"—";const s=Math.abs(v).toFixed(d);return(+s===0?"":v>0?"+":"−")+s;}
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const svgNS="http://www.w3.org/2000/svg";
+function el(tag,attrs,parent){const e=document.createElementNS(svgNS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
+const COL={ink:"#EAF0FA",muted:"#8E9BB5",line:"#22324F",gold:"#F5C451",heat:"#FF4B3A",cool:"#3DB2FF",wind:"#B49CFF",bg:"#0A1122",panel:"#0F1930"};
+
+/* =========== REAL DATA =========== */
+// NASA GISTEMP v4 global annual mean, °C vs 1951–1980 (1880–2025)
+const GIS_START=1880;
+const GIS=[-0.17,-0.09,-0.11,-0.18,-0.28,-0.33,-0.31,-0.36,-0.18,-0.11,-0.36,-0.22,-0.27,-0.31,-0.30,-0.23,-0.11,-0.11,-0.28,-0.18,
+-0.08,-0.16,-0.28,-0.37,-0.47,-0.26,-0.22,-0.38,-0.42,-0.48,-0.43,-0.44,-0.37,-0.34,-0.15,-0.14,-0.36,-0.46,-0.30,-0.27,
+-0.27,-0.18,-0.28,-0.26,-0.27,-0.22,-0.11,-0.21,-0.20,-0.36,-0.15,-0.09,-0.16,-0.28,-0.13,-0.20,-0.15,-0.03,0.00,-0.02,
+0.12,0.18,0.06,0.09,0.20,0.09,-0.07,-0.03,-0.11,-0.11,-0.18,-0.07,0.01,0.08,-0.13,-0.14,-0.19,0.05,0.06,0.03,
+-0.03,0.06,0.03,0.05,-0.20,-0.11,-0.06,-0.02,-0.08,0.05,0.03,-0.08,0.01,0.16,-0.07,-0.01,-0.10,0.18,0.07,0.16,
+0.26,0.32,0.14,0.32,0.16,0.12,0.18,0.32,0.39,0.27,0.45,0.41,0.22,0.23,0.31,0.45,0.33,0.47,0.61,0.38,
+0.39,0.53,0.63,0.62,0.53,0.68,0.64,0.67,0.54,0.66,0.72,0.61,0.65,0.67,0.75,0.90,1.01,0.91,0.85,0.98,
+1.01,0.85,0.89,1.17,1.28,1.19];
+const gis=y=>GIS[Math.max(0,Math.min(GIS.length-1,y-GIS_START))];
+// NOAA GML Mauna Loa annual mean CO2, ppm (1959–2024)
+const CO2=[315.98,316.91,317.64,318.45,318.99,319.62,320.04,321.37,322.18,323.05,324.62,325.68,326.32,327.46,329.68,330.19,331.13,332.03,333.84,335.41,336.84,338.76,340.12,341.48,343.15,344.87,346.35,347.61,349.31,351.69,353.20,354.45,355.70,356.54,357.21,358.96,360.97,362.74,363.88,366.84,368.54,369.71,371.32,373.45,375.98,377.70,379.98,382.09,384.02,385.83,387.64,390.10,391.85,394.06,396.74,398.81,401.01,404.41,406.76,408.72,411.65,414.21,416.41,418.53,421.08,424.61];
+// NSIDC Sea Ice Index, Arctic September mean extent, million km² (1979–2024)
+const ICE=[7.20,7.85,7.25,7.45,7.52,7.17,6.93,7.54,7.48,7.49,7.04,6.24,6.55,7.55,6.50,7.18,6.13,7.88,6.74,6.56,6.24,6.32,6.75,5.96,6.15,6.05,5.57,5.92,4.30,4.68,5.36,4.90,4.56,3.57,5.21,5.22,4.62,4.53,4.82,4.79,4.36,4.00,4.95,4.87,4.37,4.38];
+// Global mean sea level, mm vs 1993: anchored to NASA totals (~100 mm by 2025, +5.9 mm in 2024, +0.8 mm in 2025)
+const SEA=range(1993,2025).map(y=>{const t=y-1993;const w={1997:2,1998:4,2008:-3,2011:-6,2012:-2,2016:3,2021:-2,2022:-2};let v=2.05*t+0.036*t*t+(w[y]||0);if(y===2023)v=92.3;if(y===2024)v=98.2;if(y===2025)v=99.0;return +v.toFixed(1);});
+// Greenland mass change, Gt vs 2002 (approximate GRACE/GRACE-FO; 2018 left as a mission gap)
+const GL_LOSS=[0,-180,-210,-240,-230,-280,-250,-260,-370,-340,-460,-60,-230,-220,-250,-90,-100,-530,-230,-200,-250,-210,-120,-200];
+const GL=[];GL_LOSS.reduce((a,v,i)=>{a+=v;GL.push(2002+i===2018?null:a);return a;},0);
+
+const CASES=[
+ {id:"temp",chip:"Temperature",title:"Global surface temperature",unit:"°C",dig:2,start:1880,vals:GIS,status:"real",lat:40.8,lon:-73.96,
+  what:"Average air and sea-surface temperature, compared with 1951–1980",where:"Everywhere, fastest over the Arctic and over land",
+  src:"NASA GISS Surface Temperature Analysis (GISTEMP v4)",url:"https://data.giss.nasa.gov/gistemp/",perDec:"°C / decade"},
+ {id:"co2",chip:"CO₂",title:"Carbon dioxide in the air",unit:"ppm",dig:1,start:1959,vals:CO2,status:"real",lat:19.54,lon:-155.58,
+  what:"CO₂ concentration in parts per million",where:"Well mixed worldwide, so one mountain-top record speaks for the planet",
+  src:"NOAA GML Mauna Loa annual means",url:"https://gml.noaa.gov/ccgg/trends/",perDec:"ppm / decade"},
+ {id:"ice",chip:"Arctic ice",title:"Arctic sea ice in September",unit:"M km²",dig:2,start:1979,vals:ICE,status:"real",lat:82,lon:-10,
+  what:"Ocean area covered by ice at the late-summer low",where:"The Arctic Ocean, worst in the Beaufort, Chukchi and Siberian seas",
+  src:"NSIDC Sea Ice Index, September monthly mean",url:"https://nsidc.org/data/seaice_index",perDec:"M km² / decade"},
+ {id:"sea",chip:"Sea level",title:"Global mean sea level",unit:"mm",dig:0,start:1993,vals:SEA,status:"anch",lat:-5,lon:-150,
+  what:"Ocean height from radar satellites, relative to 1993",where:"Global, fastest in the western tropical Pacific",
+  src:"NASA sea level record (TOPEX/Poseidon → Sentinel-6)",url:"https://www.jpl.nasa.gov/news/nasa-analysis-shows-la-nina-limited-sea-level-rise-in-2025/",perDec:"mm / decade"},
+ {id:"gl",chip:"Greenland",title:"Greenland ice sheet mass",unit:"Gt",dig:0,start:2002,vals:GL,status:"est",lat:72,lon:-40,gapNote:"GRACE → GRACE-FO gap",
+  what:"Ice mass weighed from orbit by gravity, relative to 2002",where:"Coastal margins in the west, southeast and northwest",
+  src:"NASA/DLR GRACE and NASA/GFZ GRACE-FO",url:"https://grace.jpl.nasa.gov/",perDec:"Gt / decade"}
+];
+
+/* =========== STATISTICS =========== */
+function erf(x){const s=Math.sign(x);x=Math.abs(x);const t=1/(1+.3275911*x);return s*(1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-.284496736)*t+.254829592)*t*Math.exp(-x*x));}
+const Phi=z=>.5*(1+erf(z/Math.SQRT2));
+function stats(start,vals,from,to){
+  const xs=[],ys=[];vals.forEach((v,i)=>{const y=start+i;if(y>=from&&(to==null||y<=to)&&v!=null){xs.push(y);ys.push(v);}});
+  const n=xs.length;if(n<4)return null;
+  const mx=xs.reduce((a,b)=>a+b)/n,my=ys.reduce((a,b)=>a+b)/n;
+  let sxy=0,sxx=0;for(let i=0;i<n;i++){sxy+=(xs[i]-mx)*(ys[i]-my);sxx+=(xs[i]-mx)**2;}
+  const b=sxy/sxx,a=my-b*mx;let ss=0;for(let i=0;i<n;i++)ss+=(ys[i]-(a+b*xs[i]))**2;const sd=Math.sqrt(ss/(n-2));
+  const sl=[];let S=0;for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){sl.push((ys[j]-ys[i])/(xs[j]-xs[i]));S+=Math.sign(ys[j]-ys[i]);}
+  sl.sort((p,q)=>p-q);const m=sl.length;const sen=m%2?sl[(m-1)/2]:(sl[m/2-1]+sl[m/2])/2;
+  const vS=n*(n-1)*(2*n+5)/18;const Z=S>0?(S-1)/Math.sqrt(vS):S<0?(S+1)/Math.sqrt(vS):0;const p=2*(1-Phi(Math.abs(Z)));
+  const ic=my-sen*mx;const fit=y=>ic+sen*y;
+  let toe=null;if(sen!==0){const yrs=Math.ceil(2*sd/Math.abs(sen));if(xs[0]+yrs<=xs[n-1])toe=xs[0]+yrs;}
+  return{n,sen,sd,p,toe,from:xs[0],to:xs[n-1],fit};
+}
+function forecast(start,vals,toYear){const last=start+vals.length-1;const st=stats(start,vals,last-24);if(!st)return null;
+  const span=Math.max(1,last-st.from);return{st,last,at:y=>st.fit(y),band:y=>2*st.sd*(1+(y-last)/span*.6)};}
+
+/* =========== REGIONAL MODEL (estimates until live data arrives) =========== */
+function tempAmp(lat,lon){let a=1.35;const al=Math.abs(lat);if(lat>55)a+=1.9*Math.min(1,(lat-55)/25);if(lat>25&&lat<47&&lon>-12&&lon<65)a+=.3;if(al<20)a-=.2;if(lat<-20)a-=.25;if(lat<-60)a+=.3;return a;}
+function rainTrend(lat,lon){const al=Math.abs(lat);let r=.6;if(al>=18&&al<=40)r=-1.8;if(lat>30&&lat<46&&lon>-10&&lon<45)r=-3.2;if(lat>8&&lat<35&&lon>65&&lon<125)r=1.5;if(lat>10&&lat<18&&lon>-17&&lon<40)r=2.0;if(al>50)r=2.4;if(al<12)r=1.0;return r;}
+function windBase(lat){return 2.7+1.7*Math.min(1,Math.abs(lat)/55);}
+function seaRate(lat,lon){const sq=x=>x*x;let r=3.3+3.6*Math.exp(-sq((lon-140)/25)-sq(lat/15))-1.8*Math.exp(-sq((lon+110)/30)-sq(lat/15))+1.3*Math.exp(-sq((lon+70)/12)-sq((lat-37)/6));if(lat<-55)r-=.9;if(lat>58&&lon>-80&&lon<-20)r-=2.2;return Math.max(.5,r);}
+const LOW={"Egypt":1.3,"Bangladesh":1.6,"Netherlands":1.15,"Indonesia":1.35,"Vietnam":1.3,"Nigeria":1.2,"Philippines":1.4,"Thailand":1.3,"United States":1.1,"Italy":1.1};
+function localSeries(place){
+  const {lat,lon,name}=place;const r=rng(hash(name));const yrs=range(1981,2025);
+  const amp=tempAmp(lat,lon);
+  const temp=yrs.map(y=>+(gis(y)*amp+gauss(r)*.22).toFixed(2));
+  const rt=rainTrend(lat,lon);const rain=yrs.map(y=>+((y-1995)/10*rt+gauss(r)*9).toFixed(1));
+  const wb=windBase(lat);const wind=yrs.map(y=>+(wb+(y<=2010?-(y-1981)*.008:-.232+(y-2010)*.022)+gauss(r)*.07).toFixed(2));
+  let sea=null;if(!place.landlocked){const f=seaRate(lat,lon)/3.3*(LOW[name]||1);sea=range(1993,2025).map((y,i)=>+(SEA[i]*f+gauss(r)*4).toFixed(1));}
+  return{temp,rain,wind,sea,amp,rt,src:"est"};
+}
+
+/* =========== NASA POWER (live when deployed) =========== */
+async function fetchPower(place){
+  const url=`https://power.larc.nasa.gov/api/temporal/monthly/point?parameters=T2M,PRECTOTCORR,WS10M&community=AG&longitude=${place.lon.toFixed(2)}&latitude=${place.lat.toFixed(2)}&start=1981&end=2024&format=JSON`;
+  const ctl=new AbortController();const tm=setTimeout(()=>ctl.abort(),9000);
+  try{const res=await fetch(url,{signal:ctl.signal});clearTimeout(tm);if(!res.ok)return null;const j=await res.json();const P=j.properties&&j.properties.parameter;if(!P)return null;
+    const yrs=range(1981,2024);const ann=(k)=>yrs.map(y=>{const v=P[k]&&P[k][y+"13"];return v==null||v<=-990?null:v;});
+    const t=ann("T2M"),pr=ann("PRECTOTCORR"),w=ann("WS10M");if(t.every(v=>v==null))return null;
+    const base=a=>{const s=a.slice(0,30).filter(v=>v!=null);return s.reduce((p,q)=>p+q,0)/s.length;};
+    const tb=base(t),pb=base(pr);
+    return{temp:t.map(v=>v==null?null:+(v-tb).toFixed(2)),rain:pr.map(v=>v==null?null:+((v/pb-1)*100).toFixed(1)),wind:w.map(v=>v==null?null:+v.toFixed(2)),tAbs:tb,pAbs:pb*365};
+  }catch(_){clearTimeout(tm);return null;}
+}
+
+/* =========== COUNTRIES =========== */
+const LANDLOCKED=new Set("Afghanistan,Andorra,Armenia,Austria,Azerbaijan,Belarus,Bhutan,Bolivia,Botswana,Burkina Faso,Burundi,Central African Rep.,Central African Republic,Chad,Czech Rep.,Czech Republic,Czechia,Ethiopia,Hungary,Kazakhstan,Kosovo,Kyrgyzstan,Lao PDR,Laos,Lesotho,Liechtenstein,Luxembourg,Malawi,Mali,Moldova,Mongolia,Nepal,Niger,Macedonia,North Macedonia,Paraguay,Rwanda,San Marino,Serbia,Slovakia,S. Sudan,South Sudan,Switzerland,Tajikistan,Turkmenistan,Uganda,Uzbekistan,Zambia,Zimbabwe,Swaziland,eSwatini".split(","));
+const FALLBACK=[["Egypt",26.8,30.8],["United States",39.8,-98.6],["India",22,79],["China",35,103],["Brazil",-10,-52],["United Kingdom",54,-2],["Germany",51,10],["France",46.5,2.5],["Nigeria",9,8],["Kenya",.5,38],["South Africa",-29,25],["Saudi Arabia",24,45],["United Arab Emirates",24,54],["Morocco",31.8,-7],["Algeria",28,2.6],["Tunisia",34,9.5],["Jordan",31,36.5],["Lebanon",33.9,35.8],["Turkey",39,35],["Pakistan",30,70],["Bangladesh",23.7,90.3],["Indonesia",-2,118],["Japan",36.5,138],["Australia",-25,134],["Canada",58,-100],["Mexico",23.6,-102.5],["Argentina",-35,-65],["Russia",61,100],["Spain",40.2,-3.6],["Italy",42.8,12.5],["Netherlands",52.2,5.3],["Philippines",12.5,122],["Vietnam",15.8,106.3],["Thailand",15.5,101],["Iran",32.4,53.7],["Iraq",33,43.7],["Sudan",15.5,30],["Ethiopia",9,39.5],["Greenland",72,-40],["Norway",64.5,12],["Chile",-35.7,-71.5],["Peru",-9.2,-75],["Colombia",4,-73],["New Zealand",-41.5,172.8],["South Korea",36.3,127.8],["Qatar",25.3,51.2],["Kuwait",29.3,47.6],["Libya",27,17],["Switzerland",46.8,8.2],["Kazakhstan",48,67]];
+let COUNTRIES=[],mapOK=false;
+function decodeRing(str,off,scale){const out=[];let px=off[0],py=off[1];for(let i=0;i<str.length;i+=2){let x=str.charCodeAt(i)-64,y=str.charCodeAt(i+1)-64;x=(x>>1)^(-(x&1));y=(y>>1)^(-(y&1));x+=px;y+=py;px=x;py=y;out.push([x/scale,y/scale]);}return out;}
+function loadCountries(){
+  const g=window.__worldGeo;if(!g||!g.features||!g.features.length)return false;
+  const enc=!!g.UTF8Encoding,scale=g.UTF8Scale||1024;
+  for(const f of g.features){const geo=f.geometry;if(!geo)continue;const polys=[];
+    const rings=(coords,offs)=>coords.map((c,i)=>enc&&typeof c==="string"?decodeRing(c,offs[i],scale):c);
+    try{if(geo.type==="Polygon")polys.push(rings(geo.coordinates,geo.encodeOffsets||[]));
+      else if(geo.type==="MultiPolygon")geo.coordinates.forEach((pc,i)=>polys.push(rings(pc,(geo.encodeOffsets||[])[i]||[])));}catch(_){continue;}
+    try{
+    const okPolys=polys.map(p=>p.filter(r=>Array.isArray(r)&&r.length>2&&Array.isArray(r[0]))).filter(p=>p.length);
+    if(!okPolys.length)continue;const name=String((f.properties&&f.properties.name)||f.id||"Unknown");
+    let big=okPolys[0][0],bb=[180,90,-180,-90];
+    okPolys.forEach(p=>{if(p[0].length>big.length)big=p[0];p[0].forEach(pt=>{const x=+pt[0],y=+pt[1];bb[0]=Math.min(bb[0],x);bb[1]=Math.min(bb[1],y);bb[2]=Math.max(bb[2],x);bb[3]=Math.max(bb[3],y);});});
+    let cx=0,cy=0;big.forEach(pt=>{cx+=+pt[0];cy+=+pt[1];});cx/=big.length;cy/=big.length;
+    const fb=FALLBACK.find(q=>q[0]===name);if(fb){cy=fb[1];cx=fb[2];}
+    if(!isFinite(cx)||!isFinite(cy))continue;
+    COUNTRIES.push({name,polys:okPolys,bb,lat:cy,lon:cx,landlocked:LANDLOCKED.has(name)||name==="Antarctica"});
+    }catch(_){continue;}}
+  COUNTRIES.sort((a,b)=>a.name.localeCompare(b.name));return COUNTRIES.length>50;
+}
+try{mapOK=loadCountries();}catch(e){console.warn(e);mapOK=false;COUNTRIES=[];}
+if(!mapOK)COUNTRIES=FALLBACK.map(([name,lat,lon])=>({name,lat,lon,polys:null,landlocked:LANDLOCKED.has(name)})).sort((a,b)=>a.name.localeCompare(b.name));
+function inRing(x,y,r){let c=false;for(let i=0,j=r.length-1;i<r.length;j=i++){const xi=r[i][0],yi=r[i][1],xj=r[j][0],yj=r[j][1];if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi))c=!c;}return c;}
+function countryAt(lat,lon){if(!mapOK)return null;for(const c of COUNTRIES){const b=c.bb;if(lon<b[0]||lon>b[2]||lat<b[1]||lat>b[3])continue;for(const p of c.polys)if(inRing(lon,lat,p[0]))return c;}return null;}
+const seriesCache=new Map();
+function seriesFor(c){if(!seriesCache.has(c.name))seriesCache.set(c.name,localSeries(c));return seriesCache.get(c.name);}
+
+/* =========== STATE =========== */
+let user=store.get("user")||{name:"",place:null,birth:null};
+let place=null;let layer="heat",mapYear=2025,step="place",factor="temp";
+
+/* =========== TEXTURE =========== */
+const small=Math.min(innerWidth,innerHeight)<700;
+const TW=small?2048:4096,TH=TW/2;
+const base=document.createElement("canvas");base.width=TW;base.height=TH;const bx=base.getContext("2d");
+const tex=document.createElement("canvas");tex.width=TW;tex.height=TH;const tx=tex.getContext("2d");
+const X=lon=>(lon+180)/360*TW,Y=lat=>(90-lat)/180*TH;
+function tracePoly(ctx,poly){for(const ring of poly){let prev=null;ring.forEach(([lo,la],i)=>{const x=X(lo),y=Y(la);if(i===0||(prev!=null&&Math.abs(lo-prev)>180))ctx.moveTo(x,y);else ctx.lineTo(x,y);prev=lo;});ctx.closePath();}}
+// simplified fallback land outlines
+const LAND=[[[-166,68],[-140,69.5],[-110,68],[-88,68.5],[-82,55],[-77,60],[-61,56],[-56,52],[-66,44.5],[-74,40.5],[-81,31.5],[-80,25.5],[-84,30],[-90,29],[-97,27.5],[-96,19],[-87,21.5],[-84,15.5],[-77.5,8.5],[-86,11],[-98,16.2],[-105.5,20.5],[-112.5,30.5],[-117,32.5],[-124,40.5],[-124.7,48.4],[-133,57.5],[-147,61],[-162,55],[-165,64.5]],
+[[-73,78],[-50,82.5],[-20,82],[-22,72],[-40,65],[-43,60],[-53,67],[-60,76]],
+[[-77,8.5],[-60,8.5],[-50,1.5],[-35,-5.5],[-40.5,-21.5],[-53.5,-34],[-62,-39],[-68.5,-53],[-75.5,-47],[-71.5,-30],[-70.2,-18.5],[-81,-5],[-78.5,2.5]],
+[[-9.5,43],[-6,36.2],[3,41.8],[12.5,41.5],[19.5,41.5],[22.5,36.5],[27,38],[36,36.8],[34.3,31.3],[39,21.5],[43.3,12.7],[52,16],[58.5,20.5],[56.5,24.5],[48,30],[56.5,27.2],[66.5,25.4],[72.5,21],[77.5,8],[80.3,13.5],[87,21.5],[94,18.5],[98.3,8],[103.5,1.3],[100,13.2],[105,8.6],[109.3,13.5],[106.8,20.7],[114,22.3],[121.8,29.9],[119.2,35],[122.5,37],[118,38.5],[121,40.8],[126.6,37],[129.3,35.2],[130.7,42.3],[141.4,52],[135.2,54.7],[143.6,59.4],[156,59.5],[156.7,51],[163.5,59.5],[177.5,62.5],[187,66],[180,69.8],[152,70.9],[130,71],[104,77.7],[81,73.7],[69,72.9],[44,68.5],[33,69.3],[15,68.5],[5,62],[5.5,58],[12.8,56],[8.2,55.5],[4,51.8],[-1.5,48.7],[-4.5,47.8],[-1.5,43.5]],
+[[-5.9,35.8],[10,37.2],[11,33.2],[19.9,30.9],[32.3,31.2],[34.9,29.5],[39.7,15.2],[43.3,11.5],[51.2,11.8],[47.8,4.5],[39.2,-6.5],[40.5,-15],[35,-19.5],[32.8,-28.5],[20,-34.8],[14.5,-22.5],[12.2,-6],[9.3,1],[4.5,6.3],[-7.5,4.4],[-17.5,14.7],[-13,27.8],[-8,33.7]],
+[[113.5,-22],[115,-33.6],[124,-33],[135.6,-34.8],[141.6,-38.4],[150,-37.4],[153.6,-28],[146.3,-19],[142.5,-10.8],[136.8,-15.8],[131,-12.2],[122.5,-17.3]],
+[[-5.7,50],[1.4,51.2],[.2,53.4],[-1.8,57.5],[-5,58.6],[-4.8,54.8],[-5.2,51.7]],[[130.5,31.2],[140.8,35.7],[141.4,41.4],[139.4,38.2],[131.2,34.4]],
+[[109,1.8],[116,6.9],[117.8,1],[116,-3.9],[110.2,-1.8]],[[95.3,5.6],[106,-3],[105.8,-5.8],[98.5,1.7]],[[131,-1.3],[145,-4.3],[150,-10.4],[141,-9.1],[137.9,-5.4]],[[49.3,-12],[47,-25],[43.8,-23.5],[44,-17]]];
+function paintBase(img){
+  const og=bx.createLinearGradient(0,0,0,TH);og.addColorStop(0,"#1A3550");og.addColorStop(.18,"#0E2A47");og.addColorStop(.5,"#0B2A4D");og.addColorStop(.82,"#0E2A47");og.addColorStop(1,"#1A3550");
+  bx.fillStyle=og;bx.fillRect(0,0,TW,TH);
+  if(img){bx.drawImage(img,0,0,TW,TH);return;}
+  // land path
+  const landPath=()=>{bx.beginPath();if(mapOK)COUNTRIES.forEach(c=>c.polys.forEach(p=>tracePoly(bx,p)));else LAND.forEach(r=>tracePoly(bx,[r]));bx.rect(0,Y(-63),TW,TH-Y(-63));};
+  bx.save();landPath();bx.clip("nonzero");
+  const lg=bx.createLinearGradient(0,0,0,TH);
+  [[90,"#E8EEF2"],[76,"#D9E2E6"],[70,"#8E8C72"],[62,"#4A5A3A"],[52,"#355A30"],[44,"#5A7440"],[35,"#9C8E5E"],[28,"#C9A66B"],[18,"#C49A60"],[12,"#5E7A3A"],[5,"#2E5A2A"],[-8,"#2F5B2A"],[-16,"#6F7A40"],[-24,"#B89060"],[-32,"#9A8A5A"],[-40,"#5E7440"],[-52,"#6E7A5A"],[-62,"#DDE5EA"],[-90,"#EEF2F5"]].forEach(([la,c])=>lg.addColorStop((90-la)/180,c));
+  bx.fillStyle=lg;bx.fillRect(0,0,TW,TH);
+  const blob=(lo,la,rx,ry,c)=>{const g=bx.createRadialGradient(X(lo),Y(la),0,X(lo),Y(la),rx/360*TW);g.addColorStop(0,c);g.addColorStop(1,"rgba(0,0,0,0)");bx.save();bx.translate(X(lo),Y(la));bx.scale(1,ry/rx);bx.translate(-X(lo),-Y(la));bx.fillStyle=g;bx.fillRect(0,0,TW,TH);bx.restore();};
+  blob(100,22,26,12,"rgba(52,98,48,.95)");blob(80,18,10,8,"rgba(110,120,60,.8)");blob(-85,34,14,8,"rgba(70,100,50,.9)");blob(-50,-22,12,9,"rgba(60,100,50,.9)");
+  blob(115,32,12,8,"rgba(70,105,55,.9)");blob(-100,40,10,8,"rgba(150,135,90,.7)");blob(150,-30,7,7,"rgba(80,110,60,.7)");blob(25,52,22,6,"rgba(70,105,50,.8)");blob(-60,-35,8,6,"rgba(110,130,70,.8)");
+  const r=rng(7);for(let i=0;i<TW*TH/180;i++){bx.fillStyle=`rgba(${r()<.5?0:255},${r()<.5?0:255},0,${.03+r()*.04})`;bx.fillRect(r()*TW,r()*TH,2,2);}
+  if(mapOK){const gr=COUNTRIES.find(c=>c.name==="Greenland");if(gr){bx.fillStyle="#E4EAEE";bx.beginPath();gr.polys.forEach(p=>tracePoly(bx,p));bx.fill();}}
+  bx.restore();
+}
+const ramp=(stops,t)=>{t=Math.max(0,Math.min(1,t));for(let i=1;i<stops.length;i++){if(t<=stops[i][0]){const[a,ca]=stops[i-1],[b,cb]=stops[i];const k=(t-a)/(b-a);return ca.map((v,j)=>Math.round(v+(cb[j]-v)*k));}}return stops[stops.length-1][1];};
+const RAMPS={
+ heat:{stops:[[0,[61,178,255]],[.25,[230,232,236]],[.5,[255,196,120]],[.75,[255,75,58]],[1,[150,10,40]]],lo:-.5,hi:2.5,unit:"°C",fmt:v=>fmt(v,1)+" °C"},
+ rain:{stops:[[0,[170,95,40]],[.5,[220,224,230]],[1,[30,120,230]]],lo:-15,hi:15,unit:"%",fmt:v=>fmt(v,0)+"% rain"},
+ wind:{stops:[[0,[90,60,170]],[.5,[220,224,230]],[1,[180,156,255]]],lo:-.35,hi:.35,unit:"m/s",fmt:v=>fmt(v,2)+" m/s wind"}};
+function layerValue(c,yr){
+  if(layer==="heat"){const r=rng(hash(c.name)+yr)();return gis(yr)*tempAmp(c.lat,c.lon)+(r-.5)*.3*(yr<1981?1:0);}
+  if(layer==="rain")return rainTrend(c.lat,c.lon)*(yr-1995)/10;
+  if(layer==="wind"){return yr<=2010?-(yr-1981)*.008:-.232+(yr-2010)*.022;}
+  return null;}
+function paintTexture(){
+  tx.drawImage(base,0,0);
+  if(layer!=="natural"){
+    const R=RAMPS[layer];
+    if(mapOK){COUNTRIES.forEach(c=>{if(c.name==="Antarctica")return;const v=layerValue(c,mapYear);const col=ramp(R.stops,(v-R.lo)/(R.hi-R.lo));tx.fillStyle=`rgba(${col},.78)`;tx.beginPath();c.polys.forEach(p=>tracePoly(tx,p));tx.fill("evenodd");});}
+    else{const img=tx.getImageData(0,0,1,1);for(let la=-60;la<80;la+=4)for(let lo=-180;lo<180;lo+=4){const v=layer==="heat"?gis(mapYear)*tempAmp(la,lo):layer==="rain"?rainTrend(la,lo)*(mapYear-1995)/10:0;const col=ramp(R.stops,(v-R.lo)/(R.hi-R.lo));tx.fillStyle=`rgba(${col},.35)`;tx.fillRect(X(lo),Y(la+4),X(lo+4)-X(lo),Y(la)-Y(la+4));}void img;}
+  }
+  if(mapOK){tx.strokeStyle="rgba(255,255,255,.38)";tx.lineWidth=TW/4096*1.6;tx.beginPath();COUNTRIES.forEach(c=>c.polys.forEach(p=>tracePoly(tx,p)));tx.stroke();}
+  if(place&&mapOK&&place.polys){tx.save();tx.beginPath();place.polys.forEach(p=>tracePoly(tx,p));tx.fillStyle="rgba(245,196,81,.18)";tx.fill("evenodd");tx.strokeStyle=COL.gold;tx.lineWidth=TW/4096*5;tx.shadowColor=COL.gold;tx.shadowBlur=TW/4096*14;tx.stroke();tx.restore();}
+  if(texture)texture.needsUpdate=true;
+  else if(typeof glOK!=="undefined"&&!glOK)drawFlat();
+}
+function drawFlat(){const r=stage.getBoundingClientRect();if(!r.width)return;const d=Math.min(2,devicePixelRatio||1);cv.width=r.width*d;cv.height=r.height*d;const c=cv.getContext("2d");if(!c)return;
+  const w=r.width*d,h=w/2,y0=(r.height*d-h)/2;c.drawImage(tex,0,y0,w,h);
+  if(place){c.fillStyle=COL.gold;c.beginPath();c.arc((place.lon+180)/360*w,y0+(90-place.lat)/180*h,5*d,0,7);c.fill();}}
+
+/* =========== 3D GLOBE =========== */
+const stage=$("#stage"),cv=$("#gl");let renderer,scene,camera,globe,texture,marker,ring,dist=3.6,rx=.35,ry=0,trx=null,trY=null,autoSpin=!matchMedia("(prefers-reduced-motion: reduce)").matches,glOK=true;
+function lonLatToVec(lat,lon,r){const phi=(lon+180)*D,theta=(90-lat)*D;return new THREE.Vector3(-r*Math.sin(theta)*Math.cos(phi),r*Math.cos(theta),r*Math.sin(theta)*Math.sin(phi));}
+function initGL(){
+  if(!window.THREE){glOK=false;return;}
+  try{renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});}catch(_){glOK=false;return;}
+  renderer.setPixelRatio(Math.min(2,devicePixelRatio||1));renderer.outputEncoding=THREE.sRGBEncoding;
+  scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(35,1,.1,100);camera.position.set(0,0,dist);
+  texture=new THREE.CanvasTexture(tex);texture.encoding=THREE.sRGBEncoding;texture.anisotropy=renderer.capabilities.getMaxAnisotropy();
+  globe=new THREE.Mesh(new THREE.SphereGeometry(1,128,96),new THREE.MeshPhongMaterial({map:texture,shininess:8,specular:new THREE.Color(0x18202c)}));
+  scene.add(globe);
+  const atm=new THREE.Mesh(new THREE.SphereGeometry(1.09,64,48),new THREE.ShaderMaterial({transparent:true,side:THREE.BackSide,blending:THREE.AdditiveBlending,depthWrite:false,
+    vertexShader:"varying vec3 vN;void main(){vN=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}",
+    fragmentShader:"varying vec3 vN;void main(){float i=pow(0.72-dot(vN,vec3(0.,0.,1.)),3.0);gl_FragColor=vec4(0.32,0.6,1.0,1.0)*i;}"}));
+  scene.add(atm);
+  scene.add(new THREE.AmbientLight(0xffffff,.72));const sun=new THREE.DirectionalLight(0xffffff,.55);sun.position.set(-4,2.5,5);scene.add(sun);
+  marker=new THREE.Mesh(new THREE.SphereGeometry(.014,16,12),new THREE.MeshBasicMaterial({color:0xF5C451}));
+  ring=new THREE.Mesh(new THREE.RingGeometry(.022,.03,40),new THREE.MeshBasicMaterial({color:0xF5C451,transparent:true,side:THREE.DoubleSide}));
+  marker.visible=ring.visible=false;globe.add(marker);globe.add(ring);
+  resize();requestAnimationFrame(loop);
+}
+function resize(){if(!renderer)return;const r=stage.getBoundingClientRect();renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();drawStars(r.width,r.height);}
+function drawStars(w,h){const c=$("#stars");const d=Math.min(2,devicePixelRatio||1);c.width=w*d;c.height=h*d;const x=c.getContext("2d");x.scale(d,d);const r=rng(42);for(let i=0;i<w*h/1400;i++){x.fillStyle=`rgba(220,230,255,${.15+r()*.6})`;const s=r()<.92?1:1.6;x.fillRect(r()*w,r()*h,s,s);}}
+function wrapPI(a){while(a>Math.PI)a-=2*Math.PI;while(a<-Math.PI)a+=2*Math.PI;return a;}
+function flyTo(lat,lon,zoom){if(!glOK)return;const p=lonLatToVec(lat,lon,1);const a=Math.atan2(-p.x,p.z);const zp=-p.x*Math.sin(a)+p.z*Math.cos(a);const b=Math.atan2(p.y,zp);
+  trY=ry+wrapPI(a-ry);trx=Math.max(-1.3,Math.min(1.3,b));if(zoom)dist=zoom;autoSpin=false;}
+let tPulse=0;
+function loop(t){
+  if(trY!=null){ry+=(trY-ry)*.08;rx+=(trx-rx)*.08;if(Math.abs(trY-ry)<.001&&Math.abs(trx-rx)<.001){trY=trx=null;}}
+  else if(autoSpin&&!dragging)ry+=.0015;
+  camera.position.z+=(dist-camera.position.z)*.1;
+  globe.rotation.set(rx,ry,0);
+  if(ring.visible){tPulse=(t%1600)/1600;const s=1+tPulse*1.6;ring.scale.set(s,s,s);ring.material.opacity=1-tPulse;}
+  renderer.render(scene,camera);requestAnimationFrame(loop);
+}
+function setMarker(lat,lon){if(!glOK)return;const p=lonLatToVec(lat,lon,1.004);marker.position.copy(p);ring.position.copy(lonLatToVec(lat,lon,1.003));ring.lookAt(lonLatToVec(lat,lon,2));marker.visible=ring.visible=true;}
+const ray=window.THREE?new THREE.Raycaster():null,ndc=window.THREE?new THREE.Vector2():null;
+function pick(cx,cy){if(!glOK)return null;const r=cv.getBoundingClientRect();ndc.set((cx-r.left)/r.width*2-1,-((cy-r.top)/r.height*2-1));ray.setFromCamera(ndc,camera);const h=ray.intersectObject(globe)[0];if(!h||!h.uv)return null;return{lat:(h.uv.y-.5)*180,lon:h.uv.x*360-180};}
+let dragging=false,ptrs=new Map(),drag0=null,pinch0=null,lastHover=0;
+stage.addEventListener("pointerdown",e=>{stage.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(ptrs.size===2){const[a,b]=[...ptrs.values()];pinch0={d:Math.hypot(a.x-b.x,a.y-b.y),dist};}
+  drag0={x:e.clientX,y:e.clientY,rx,ry,moved:0};dragging=true;autoSpin=false;trY=trx=null;});
+stage.addEventListener("pointermove",e=>{
+  if(ptrs.has(e.pointerId))ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(ptrs.size===2&&pinch0){const[a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);dist=Math.max(1.35,Math.min(6,pinch0.dist*pinch0.d/d));if(drag0)drag0.moved=99;return;}
+  if(dragging&&drag0){const dx=e.clientX-drag0.x,dy=e.clientY-drag0.y;drag0.moved=Math.max(drag0.moved,Math.hypot(dx,dy));const k=.0045*(dist/3.6);ry=drag0.ry+dx*k;rx=Math.max(-1.3,Math.min(1.3,drag0.rx+dy*k));$("#tip").hidden=true;return;}
+  if(e.pointerType==="mouse"&&performance.now()-lastHover>60){lastHover=performance.now();hover(e);}});
+stage.addEventListener("pointerup",e=>{ptrs.delete(e.pointerId);if(ptrs.size<2)pinch0=null;if(drag0&&drag0.moved<6&&ptrs.size===0)clickAt(e.clientX,e.clientY);if(ptrs.size===0){dragging=false;drag0=null;}});
+stage.addEventListener("pointercancel",e=>{ptrs.delete(e.pointerId);dragging=false;drag0=null;pinch0=null;});
+stage.addEventListener("pointerleave",()=>{$("#tip").hidden=true;});
+stage.addEventListener("wheel",e=>{e.preventDefault();dist=Math.max(1.35,Math.min(6,dist*Math.exp(e.deltaY*.0012)));},{passive:false});
+$("#zIn").onclick=()=>dist=Math.max(1.35,dist*.8);$("#zOut").onclick=()=>dist=Math.min(6,dist*1.25);
+function hover(e){const ll=pick(e.clientX,e.clientY);const tip=$("#tip");if(!ll){tip.hidden=true;return;}const c=countryAt(ll.lat,ll.lon);if(!c){tip.hidden=true;return;}
+  const r=stage.getBoundingClientRect();const v=layer==="natural"?"":` · ${RAMPS[layer].fmt(layerValue(c,mapYear))}`;tip.textContent=c.name+v;tip.style.left=(e.clientX-r.left)+"px";tip.style.top=(e.clientY-r.top)+"px";tip.hidden=false;}
+function clickAt(x,y){const ll=pick(x,y);if(!ll)return;const c=countryAt(ll.lat,ll.lon);
+  if(c){choosePlace(c,true);}
+  else if(!mapOK){let best=null,bd=1e9;COUNTRIES.forEach(q=>{const d=(q.lat-ll.lat)**2+((q.lon-ll.lon)*Math.cos(ll.lat*D))**2;if(d<bd){bd=d;best=q;}});if(best&&bd<120)choosePlace(best,true);}}
+
+/* =========== LEGEND / CHIP =========== */
+function updateLegend(){const R=RAMPS[layer];const bar=$("#legBar");
+  if(!R){bar.style.background="linear-gradient(90deg,#0B2A4D,#2E5A2A,#C9A66B,#E8EEF2)";$("#legLo").textContent="ocean";$("#legHi").textContent="ice";}
+  else{bar.style.background=`linear-gradient(90deg,${R.stops.map(([t,c])=>`rgb(${c}) ${t*100}%`).join(",")})`;$("#legLo").textContent=fmt(R.lo,R.lo%1?1:0)+" "+R.unit;$("#legHi").textContent=fmt(R.hi,R.hi%1?1:0)+" "+R.unit;}
+  const label={heat:"warming vs 1951–1980",rain:"rainfall change since 1995 (est.)",wind:"wind change since 1981 (est.)",natural:"natural colors"}[layer];
+  if(place){$("#chipBig").textContent=place.name;$("#chipSub").textContent=(layer==="natural"?"":RAMPS[layer].fmt(layerValue(place,mapYear))+" · ")+mapYear+" · "+label;}
+  else{$("#chipBig").textContent=mapYear;$("#chipSub").textContent=label;}}
+$$(".seg button").forEach(b=>b.onclick=()=>{layer=b.dataset.layer;$$(".seg button").forEach(x=>x.setAttribute("aria-pressed",x===b));const yr=$("#year");yr.min=layer==="heat"?1950:1981;if(mapYear<+yr.min){mapYear=+yr.min;yr.value=mapYear;$("#yearTxt").textContent=mapYear;}paintTexture();updateLegend();});
+$("#year").addEventListener("input",e=>{mapYear=+e.target.value;$("#yearTxt").textContent=mapYear;paintTexture();updateLegend();});
+let playing=null;
+$("#play").onclick=()=>{if(playing){clearInterval(playing);playing=null;$("#play").textContent="▶ Play";return;}if(layer==="natural")$$(".seg button")[0].click();
+  const yr=$("#year");let y=+yr.min;$("#play").textContent="❚❚ Pause";playing=setInterval(()=>{mapYear=y;yr.value=y;$("#yearTxt").textContent=y;paintTexture();updateLegend();y++;if(y>2025){clearInterval(playing);playing=null;$("#play").textContent="▶ Play";}},150);};
+
+/* =========== ADVICE =========== */
+function adviceFor(f,dir,mag,ctx){
+  const A={
+   temp:dir>0?[
+    mag>1.5?"Treat heat as a health risk: check on older neighbours during heatwaves and know the signs of heat stroke.":"Learn the early signs of heat exhaustion and keep water with you on hot days.",
+    "Plant or protect shade trees. A street tree can cool the pavement under it by more than 10 °C.",
+    "Use light-coloured or reflective roofs and curtains to keep buildings cooler without extra power.",
+    "Cut the cause: walk, cycle or use public transport for short trips, and switch to efficient appliances."]:
+    ["Your place is not warming much, but the planet is. Keep pushing for clean energy where you live."],
+   rain:dir<0?[
+    "Rain is falling short. Fix leaks and choose drip irrigation over sprinklers for gardens and farms.",
+    "Collect rainwater when it does fall, and reuse grey water for plants.",
+    ctx.coastal?"Over-pumping coastal groundwater lets salt water seep in. Support limits on well drilling.":"Support local water storage and protect wetlands that recharge aquifers.",
+    "Pick drought-tolerant native plants instead of thirsty lawns."]:[
+    "Heavier rain means flash floods. Keep drains and gutters clear before the rainy season.",
+    "Know your area's flood routes and keep important documents in a waterproof bag.",
+    "Support green spaces and permeable pavements so rain soaks in instead of flooding streets.",
+    "Store extra rain for dry spells; wetter on average often still means bigger swings."],
+   wind:[
+    dir>0?"Winds are picking up again. Secure rooftop items and check that signs and panels are anchored.":"Calmer air traps pollution. Watch air-quality alerts and limit outdoor exercise on stagnant days.",
+    "Ask whether your area could host wind power. Stronger, steadier winds make projects pay off faster.",
+    "Dust storms ride strong winds. Keep a mask at home if you live near deserts or dry farmland."],
+   sea:[
+    "Check a coastal flood map for your street, and avoid buying or building in the lowest zones.",
+    "Support dunes, mangroves, seagrass and wetlands. They break waves and trap sediment for free.",
+    "Coastal aquifers turn salty as the sea rises. Use water carefully and back limits on over-pumping.",
+    "Ask local officials what their sea level plan is for 2050. Plans made now are cheaper than repairs later."]
+  };return A[f]||[];}
+
+/* =========== STEP 1: PLACE =========== */
+const FACTORS=[{id:"temp",name:"Temperature",unit:"°C",dig:2,color:COL.heat,per:"°C / decade",what:"Local temperature anomaly vs 1951–1980"},
+ {id:"rain",name:"Rainfall",unit:"%",dig:1,color:COL.cool,per:"% / decade",what:"Yearly rainfall vs the 1981–2010 average"},
+ {id:"wind",name:"Wind",unit:"m/s",dig:2,color:COL.wind,per:"m/s / decade",what:"Average wind speed 10 m above the ground"},
+ {id:"sea",name:"Sea level",unit:"mm",dig:0,color:"#4FD1C5",per:"mm / decade",what:"Sea level along the coast, relative to 1993"}];
+let live=null;
+function chooseFactorsSet(){return FACTORS.filter(f=>f.id!=="sea"||(place&&!place.landlocked));}
+async function choosePlace(c,fromGlobe){
+  place=c;user.place=c.name;store.set("user",user);setMarker(c.lat,c.lon);flyTo(c.lat,c.lon,mapOK?2.25:2.8);
+  live=null;try{paintTexture();updateLegend();}catch(e){console.warn(e);}renderWho();
+  if(step!=="place"&&fromGlobe)goStep("place");else renderPlace();
+  const got=await fetchPower(c);if(got&&place===c){live=got;renderPlace();}
+}
+function getFactorSeries(fid){const s=seriesFor(place);
+  if(live&&fid!=="sea"&&live[fid])return{start:1981,vals:live[fid],status:"live"};
+  if(fid==="sea")return s.sea?{start:1993,vals:s.sea,status:"est"}:null;
+  return{start:1981,vals:s[fid],status:"est"};}
+function avg3(start,vals,y){let s=0,k=0;for(let d=-1;d<=1;d++){const i=y+d-start;if(i>=0&&i<vals.length&&vals[i]!=null){s+=vals[i];k++;}}return k?s/k:null;}
+function renderPlace(){
+  const hello=$("#hello"),hl=$("#headline");
+  if(!place){hello.innerHTML="Pick a place on the globe or use <b>Change</b> at the top.";hl.innerHTML="";$("#ftabs").innerHTML="";$("#fcard").innerHTML="";$("#pledge").innerHTML="";return;}
+  const nm=esc(user.name||"Detective");const from=Math.max(1982,user.birth||1982);
+  hello.innerHTML=`<b>${nm}</b>, here is the case file for <b>${esc(place.name)}</b>${user.birth?`, measured across your lifetime since ${user.birth}`:", since NASA's local records begin in 1981"}.`;
+  const T=getFactorSeries("temp"),fT=forecast(T.start,T.vals);const last=T.start+T.vals.length-1;
+  const dT=avg3(T.start,T.vals,last-1)-avg3(T.start,T.vals,from);const t50=fT.at(2050)-avg3(T.start,T.vals,last-1);
+  hl.innerHTML=`<span class="label">Headline finding</span><p class="big"><em>${fmt(dT,1)} °C</em> ${user.birth?"in your lifetime":"since "+from}</p><p>${esc(place.name)} is warming about <b style="color:var(--ink)">${(seriesFor(place).amp).toFixed(1)}× the global average</b>. At the pace of the last 25 years it adds another <b style="color:var(--heat)">${fmt(t50,1)} °C by 2050</b>.</p>`;
+  const tabs=$("#ftabs");tabs.innerHTML="";const set=chooseFactorsSet();if(!set.find(f=>f.id===factor))factor="temp";
+  set.forEach(f=>{const b=document.createElement("button");b.setAttribute("role","tab");b.setAttribute("aria-selected",f.id===factor);b.innerHTML=`<i style="background:${f.color}"></i>${f.name}`;b.onclick=()=>{factor=f.id;renderPlace();};tabs.appendChild(b);});
+  if(place.landlocked){const n=document.createElement("span");n.className="hint";n.style.alignSelf="center";n.textContent="Landlocked, so no sea level case.";tabs.appendChild(n);}
+  renderFactor(set.find(f=>f.id===factor),from);renderPledge();
+}
+function renderFactor(f,from){
+  const S=getFactorSeries(f.id),card=$("#fcard");const last=S.start+S.vals.length-1;const fromY=Math.max(from,S.start+1);
+  const st=stats(S.start,S.vals,S.start),fc=forecast(S.start,S.vals);const now=avg3(S.start,S.vals,last-1),then=avg3(S.start,S.vals,fromY);const ch=now-then;
+  const v50=fc.at(2050);const dir=Math.sign(fc.st.sen);const sig=st.p<.05;
+  const badge=S.status==="live"?'<span class="badge live">Live NASA POWER</span>':'<span class="badge est">Estimate</span>';
+  const chCls=Math.abs(ch)<(f.id==="rain"?2:f.id==="wind"?.03:.05)?"flat":(f.id==="temp"||f.id==="sea"?(ch>0?"up":"down"):(ch>0?"down":"up"));
+  const unitTxt=f.unit==="%"?"%":" "+f.unit;
+  card.innerHTML=`<div class="card-head"><h3>${f.name}<i>${f.what}</i></h3><div class="badges">${badge}<span class="stamp ${sig?"yes":"no"}" style="font-size:12px">${sig?(st.sen>0?"Confirmed rising":"Confirmed falling"):"Not proven"}</span></div></div>
+   <div class="nums"><div><span class="k">Change since ${fromY}</span><div class="v ${chCls}">${fmt(ch,f.dig)}${unitTxt}</div></div>
+   <div><span class="k">Rate, last 25 yrs</span><div class="v">${fmt(fc.st.sen*10,f.dig===0?0:Math.min(2,f.dig))}</div><span class="k">${f.per}</span></div>
+   <div><span class="k">Forecast 2050</span><div class="v">${fmt(v50,f.dig)}${unitTxt}</div><span class="k">± ${fc.band(2050).toFixed(f.dig)}</span></div></div>
+   <svg viewBox="0 0 640 230" id="fchart" role="img" aria-label="${f.name} record and forecast"></svg>
+   <p class="verdict">${verdictText(f,st,fc,S)}</p>
+   <div class="advice"><h4>What you can do</h4><ul>${adviceFor(f.id,dir,Math.abs(f.id==="temp"?now:ch),{coastal:!place.landlocked}).map(a=>`<li>${a}</li>`).join("")}</ul></div>
+   <p class="src">${S.status==="live"?"Source: NASA POWER API, MERRA-2 and GPM-based data for this point.":"Estimate built from NASA GISTEMP and published regional patterns. Turns into live NASA POWER data on the deployed site."}</p>`;
+  miniForecast($("#fchart"),S,fc,f,fromY);
+}
+function verdictText(f,st,fc,S){const yrs=st.n;const p=st.p<.001?"p < 0.001":"p = "+st.p.toFixed(3);
+  if(f.id==="wind"){const a=stats(S.start,S.vals,1981,2010),b=stats(S.start,S.vals,2010);return `<b>Two chapters.</b> Wind slowed from 1981 to 2010 (${fmt(a.sen*10,2)} m/s per decade), then turned around (${fmt(b.sen*10,2)} m/s per decade since). Scientists call it "global stilling" and its reversal. A single straight line would hide this.`;}
+  if(st.p<.05)return `<b>The trend is real.</b> Across ${yrs} years the Mann-Kendall test gives ${p}. ${st.toe?`The signal climbed out of year-to-year noise around <b>${st.toe}</b>.`:"It has not yet fully left the noise band."}`;
+  return `<b>Not proven yet.</b> Over ${yrs} years the swings are too large to call a direction (${p}). Natural variability is still winning.`;}
+function miniForecast(svg,S,fc,f,fromY){svg.innerHTML="";const W=640,H=230,m={l:48,r:14,t:14,b:26};const x0=S.start,x1=2050,last=S.start+S.vals.length-1;
+  const v=S.vals.filter(q=>q!=null);let lo=Math.min(...v,fc.at(2050)-fc.band(2050)),hi=Math.max(...v,fc.at(2050)+fc.band(2050));const pad=(hi-lo)*.06;lo-=pad;hi+=pad;
+  const X=y=>m.l+(y-x0)/(x1-x0)*(W-m.l-m.r),Y=q=>m.t+(hi-q)/(hi-lo)*(H-m.t-m.b);
+  niceTicks(lo,hi,4).forEach(t=>{el("line",{x1:m.l,x2:W-m.r,y1:Y(t),y2:Y(t),stroke:COL.line},svg);const tt=el("text",{x:m.l-6,y:Y(t)+4,"text-anchor":"end","font-size":11,fill:COL.muted,"font-family":"IBM Plex Mono, monospace"},svg);tt.textContent=+t.toFixed(3);});
+  [1990,2000,2010,2020,2030,2040,2050].forEach(y=>{if(y<x0)return;const tt=el("text",{x:X(y),y:H-6,"text-anchor":"middle","font-size":11,fill:COL.muted,"font-family":"IBM Plex Mono, monospace"},svg);tt.textContent=y;});
+  el("rect",{x:X(last),y:m.t,width:X(2050)-X(last),height:H-m.t-m.b,fill:COL.gold,"fill-opacity":.05},svg);
+  const ft=el("text",{x:X(last)+6,y:m.t+12,"font-size":10.5,fill:COL.gold,"font-family":"IBM Plex Mono, monospace"},svg);ft.textContent="forecast";
+  if(fromY>x0){el("line",{x1:X(fromY),x2:X(fromY),y1:m.t,y2:H-m.b,stroke:COL.muted,"stroke-dasharray":"2 3"},svg);const bt=el("text",{x:X(fromY)+4,y:H-m.b-6,"font-size":10.5,fill:COL.muted,"font-family":"IBM Plex Mono, monospace"},svg);bt.textContent=user.birth?"you were born":"";}
+  let band="";for(let y=last;y<=2050;y++)band+=(y===last?"M":"L")+X(y)+" "+Y(fc.at(y)+fc.band(y));for(let y=2050;y>=last;y--)band+="L"+X(y)+" "+Y(fc.at(y)-fc.band(y));
+  el("path",{d:band+"Z",fill:f.color,"fill-opacity":.14},svg);
+  el("line",{x1:X(fc.st.from),y1:Y(fc.at(fc.st.from)),x2:X(2050),y2:Y(fc.at(2050)),stroke:f.color,"stroke-width":2,"stroke-dasharray":"6 4"},svg);
+  let d="";let pen=false;S.vals.forEach((q,i)=>{if(q==null){pen=false;return;}d+=(pen?"L":"M")+X(S.start+i).toFixed(1)+" "+Y(q).toFixed(1);pen=true;});
+  el("path",{d,fill:"none",stroke:f.color,"stroke-width":2,"stroke-linejoin":"round"},svg);
+  el("circle",{cx:X(2050),cy:Y(fc.at(2050)),r:4.5,fill:f.color},svg);
+}
+function renderPledge(){const box=$("#pledge");const chosen=new Set(store.get("pledge_"+place.name)||[]);box.innerHTML="";
+  const items=[];chooseFactorsSet().forEach(f=>{const S=getFactorSeries(f.id);const fc=forecast(S.start,S.vals);const a=adviceFor(f.id,Math.sign(fc.st.sen),1,{coastal:!place.landlocked});if(a[1])items.push(a[1]);});
+  items.push("Share this case file with one friend and ask what they would change.");
+  items.forEach((t,i)=>{const id="pl"+i;const l=document.createElement("label");l.innerHTML=`<input type="checkbox" id="${id}" ${chosen.has(i)?"checked":""}><span>${t}</span>`;l.querySelector("input").onchange=e=>{e.target.checked?chosen.add(i):chosen.delete(i);store.set("pledge_"+place.name,[...chosen]);$("#pledgeCount").textContent=chosen.size+" chosen";};box.appendChild(l);});
+  $("#pledgeCount").textContent=chosen.size+" chosen";}
+
+/* =========== STEP 2: PLANET CASE FILES =========== */
+let cur=CASES[0],curIdx=0,winFrom=CASES[0].start,predict=null,audioCtx=null,playhead=null;
+const chart=$("#chart");const CW=640,CH=300,M={l:56,r:14,t:16,b:30};
+function niceTicks(lo,hi,n){const span=hi-lo||1,s0=span/n,mag=Math.pow(10,Math.floor(Math.log10(s0))),f=s0/mag,step=(f<1.5?1:f<3?2:f<7?5:10)*mag;const out=[];for(let v=Math.ceil(lo/step)*step;v<=hi+1e-9;v+=step)out.push(+v.toFixed(10));return out;}
+const BADGE={real:'<span class="badge real">Real data</span>',anch:'<span class="badge anch">Anchored to NASA totals</span>',est:'<span class="badge est">Approximate</span>',live:'<span class="badge live">Live NASA</span>'};
+function renderCaseTabs(){const t=$("#ctabs");t.innerHTML="";CASES.forEach((c,i)=>{const b=document.createElement("button");b.setAttribute("role","tab");b.setAttribute("aria-selected",i===curIdx);b.textContent=c.chip;b.onclick=()=>selectCase(i);t.appendChild(b);});}
+function selectCase(i){curIdx=i;cur=CASES[i];winFrom=cur.id==="temp"?1950:cur.start;predict=null;stopAudio();const w=$("#win");w.min=winFrom;w.max=cur.start+cur.vals.length-9;w.value=winFrom;
+  $("#revealBtn").hidden=true;$("#predictBtn").hidden=false;$("#predictBtn").textContent="✎ Predict before you look";$("#score").textContent="";renderCaseTabs();renderCase();
+  if(glOK&&step==="planet"){setMarker(cur.lat,cur.lon);flyTo(cur.lat,cur.lon,3.2);}}
+function renderCase(){
+  const c=cur,last=c.start+c.vals.length-1,st=stats(c.start,c.vals,winFrom);
+  $("#cNo").textContent=`Case ${String(curIdx+1).padStart(2,"0")} of ${CASES.length}`;$("#cTitle").textContent=c.title;$("#winYear").textContent=winFrom;
+  $("#cBadges").innerHTML=BADGE[c.status];$("#fWhat").textContent=c.what;$("#fWhere").textContent=c.where;
+  $("#cSrc").innerHTML=`Source: <a href="${c.url}" target="_blank" rel="noopener">${c.src}</a>`;
+  const hide=predict&&!predict.revealed;const fc=forecast(c.start,c.vals);
+  if(hide){["#fRate","#fToe","#fReal","#fFore"].forEach(s=>$(s).textContent="sealed until you predict");$("#stamp").className="stamp no";$("#stamp").textContent="Sealed";}
+  else{$("#fRate").textContent=`${fmt(st.sen*10,c.dig===0?0:c.dig)} ${c.perDec}`;$("#fToe").textContent=st.toe?`${st.toe} (${st.toe-st.from} yrs in)`:"not yet";
+    const sig=st.p<.05;$("#fReal").innerHTML=sig?`Yes. Mann-Kendall p ${st.p<.001?"&lt; 0.001":"= "+st.p.toFixed(3)}, ${st.n} years`:`Not proven (p = ${st.p.toFixed(2)})`;
+    $("#fFore").textContent=`${fmt(fc.at(2050),c.dig)} ${c.unit} ± ${fc.band(2050).toFixed(c.dig)}`;
+    $("#stamp").className="stamp "+(sig?"yes":"no");$("#stamp").textContent=sig?(st.sen>0?"Confirmed rising":"Confirmed falling"):"Unproven";}
+  const full=stats(c.start,c.vals,c.id==="temp"?1950:c.start);const len=last-winFrom+1;const al=$("#alarm");
+  if(len<15){al.className="alarm warn";al.textContent=`Cherry-pick alarm: ${len} years is too short. El Niño and other swings can fake or hide a trend this short.`;}
+  else if(Math.sign(st.sen)!==Math.sign(full.sen)){al.className="alarm warn";al.textContent="Cherry-pick alarm: this start year flips the direction of the full record.";}
+  else{al.className="alarm";al.textContent=winFrom===(c.id==="temp"?1950:c.start)?`Full record, ${len} years. Drag the start year to test whether the verdict holds.`:`Verdict holds. Rate differs from the full record by ${Math.abs(st.sen/full.sen*100-100).toFixed(0)}%.`;}
+  drawChart(hide?null:st,hide?null:fc);
+}
+function domainOf(c,fc){const v=c.vals.filter(x=>x!=null);let lo=Math.min(...v),hi=Math.max(...v);if(fc){lo=Math.min(lo,fc.at(2050)-fc.band(2050));hi=Math.max(hi,fc.at(2050)+fc.band(2050));}const p=(hi-lo)*.08;return[lo-p,hi+p];}
+function drawChart(st,fc){
+  const c=cur;chart.innerHTML="";const last=c.start+c.vals.length-1;const xEnd=predict&&!predict.revealed?last:2050;
+  const showFrom=c.id==="temp"?1950:c.start;
+  let[lo,hi]=domainOf(c,fc);if(predict){const s=hi-lo;lo-=s*.2;hi+=s*.2;}
+  const X=y=>M.l+(y-showFrom)/(xEnd-showFrom)*(CW-M.l-M.r),Y=v=>M.t+(hi-v)/(hi-lo)*(CH-M.t-M.b);
+  niceTicks(lo,hi,5).forEach(v=>{el("line",{x1:M.l,x2:CW-M.r,y1:Y(v),y2:Y(v),stroke:COL.line},chart);const t=el("text",{x:M.l-8,y:Y(v)+4,"text-anchor":"end","font-size":11,fill:COL.muted,"font-family":"IBM Plex Mono, monospace"},chart);t.textContent=+v.toFixed(c.dig+1);});
+  const step=(xEnd-showFrom)>60?20:10;for(let y=Math.ceil(showFrom/step)*step;y<=xEnd;y+=step){const t=el("text",{x:X(y),y:CH-8,"text-anchor":"middle","font-size":11,fill:COL.muted,"font-family":"IBM Plex Mono, monospace"},chart);t.textContent=y;}
+  const u=el("text",{x:M.l,y:M.t-4,"font-size":11,fill:COL.muted,"font-family":"IBM Plex Mono, monospace"},chart);u.textContent=c.unit;
+  const hidden=predict&&!predict.revealed;const cut=predict?predict.cut:last+1;
+  if(winFrom>showFrom)el("rect",{x:M.l,y:M.t,width:X(winFrom)-M.l,height:CH-M.t-M.b,fill:COL.muted,"fill-opacity":.08},chart);
+  if(st){const b0=st.fit(st.from);el("rect",{x:X(st.from),width:X(st.to)-X(st.from),y:Y(b0+2*st.sd),height:Math.max(1,Y(b0-2*st.sd)-Y(b0+2*st.sd)),fill:COL.cool,"fill-opacity":.1},chart);
+    const nt=el("text",{x:X(st.from)+6,y:Y(b0+2*st.sd)+13,"font-size":10.5,fill:COL.cool,"font-family":"IBM Plex Mono, monospace"},chart);nt.textContent="noise band ±2σ";}
+  if(fc){let band="";for(let y=last;y<=2050;y++)band+=(y===last?"M":"L")+X(y)+" "+Y(fc.at(y)+fc.band(y));for(let y=2050;y>=last;y--)band+="L"+X(y)+" "+Y(fc.at(y)-fc.band(y));
+    el("path",{d:band+"Z",fill:COL.gold,"fill-opacity":.12},chart);el("line",{x1:X(last),y1:Y(fc.at(last)),x2:X(2050),y2:Y(fc.at(2050)),stroke:COL.gold,"stroke-width":2,"stroke-dasharray":"6 4"},chart);
+    el("circle",{cx:X(2050),cy:Y(fc.at(2050)),r:4.5,fill:COL.gold},chart);const ft=el("text",{x:X(2050)-6,y:Y(fc.at(2050))-10,"text-anchor":"end","font-size":11,"font-weight":600,fill:COL.gold,"font-family":"IBM Plex Mono, monospace"},chart);ft.textContent="2050: "+fmt(fc.at(2050),c.dig);}
+  if(predict){el("rect",{x:X(cut-.5),y:M.t,width:X(last)-X(cut-.5),height:CH-M.t-M.b,fill:COL.gold,"fill-opacity":hidden?.06:.02,stroke:COL.gold,"stroke-dasharray":"4 4","stroke-opacity":.4},chart);
+    if(hidden){const t=el("text",{x:(X(cut)+X(last))/2,y:M.t+18,"text-anchor":"middle","font-size":12,fill:COL.gold,"font-family":"IBM Plex Mono, monospace"},chart);t.textContent="draw where you think it went →";}}
+  let d="",pen=false;c.vals.forEach((v,i)=>{const y=c.start+i;if(y<showFrom||v==null||(hidden&&y>=cut)){pen=false;return;}d+=(pen?"L":"M")+X(y).toFixed(1)+" "+Y(v).toFixed(1);pen=true;});
+  el("path",{d,fill:"none",stroke:COL.ink,"stroke-width":1.6,"stroke-linejoin":"round"},chart);
+  c.vals.forEach((v,i)=>{const y=c.start+i;if(y<showFrom||v==null||(hidden&&y>=cut))return;el("circle",{cx:X(y),cy:Y(v),r:2.2,fill:COL.ink},chart);});
+  if(c.gapNote&&!hidden){el("line",{x1:X(2018),x2:X(2018),y1:M.t+20,y2:CH-M.b,stroke:COL.muted,"stroke-dasharray":"2 3"},chart);const t=el("text",{x:X(2018)-4,y:M.t+14,"text-anchor":"end","font-size":10.5,fill:COL.muted,"font-family":"IBM Plex Mono, monospace"},chart);t.textContent=c.gapNote;}
+  if(st){el("line",{x1:X(st.from),y1:Y(st.fit(st.from)),x2:X(st.to),y2:Y(st.fit(st.to)),stroke:COL.heat,"stroke-width":2.5},chart);
+    if(st.toe){const tx2=X(st.toe);el("line",{x1:tx2,x2:tx2,y1:M.t,y2:CH-M.b,stroke:COL.heat,"stroke-dasharray":"5 4","stroke-width":1.3},chart);const right=tx2<CW*.55;const t=el("text",{x:right?tx2+6:tx2-6,y:CH-M.b-8,"text-anchor":right?"start":"end","font-size":11,"font-weight":600,fill:COL.heat,"font-family":"IBM Plex Mono, monospace"},chart);t.textContent="signal emerges "+st.toe;}}
+  if(predict&&predict.guess){let gd="",on=false;for(let y=cut-1;y<=last;y++){const v=y===cut-1?lastKnown(cut):predict.guess[y];if(v==null){on=false;continue;}gd+=(on?"L":"M")+X(y).toFixed(1)+" "+Y(v).toFixed(1);on=true;}
+    el("path",{d:gd,fill:"none",stroke:COL.gold,"stroke-width":2.6,"stroke-dasharray":"2 5","stroke-linecap":"round"},chart);}
+  playhead=el("line",{x1:-10,x2:-10,y1:M.t,y2:CH-M.b,stroke:COL.gold,"stroke-width":2,opacity:0},chart);
+  chart._X=X;chart._lo=lo;chart._hi=hi;chart._showFrom=showFrom;chart._xEnd=xEnd;
+}
+function lastKnown(cut){for(let y=cut-1;y>=cur.start;y--){const v=cur.vals[y-cur.start];if(v!=null)return v;}return null;}
+$("#predictBtn").onclick=()=>{const c=cur,n=c.vals.length,showFrom=c.id==="temp"?1950:c.start;const cut=Math.round(showFrom+(c.start+n-1-showFrom)*.55);predict={cut,guess:{},revealed:false};winFrom=showFrom;$("#win").value=winFrom;
+  $("#predictBtn").hidden=true;$("#revealBtn").hidden=false;$("#revealBtn").disabled=true;stopAudio();renderCase();$("#score").textContent="Draw on the shaded part of the chart.";};
+function chartPoint(e){const r=chart.getBoundingClientRect();const sx=(e.clientX-r.left)/r.width*CW,sy=(e.clientY-r.top)/r.height*CH;
+  const y=Math.round(chart._showFrom+(sx-M.l)/(CW-M.l-M.r)*(chart._xEnd-chart._showFrom));const v=chart._hi-(sy-M.t)/(CH-M.t-M.b)*(chart._hi-chart._lo);return{y,v};}
+let drawingP=false,prevPt=null;
+chart.addEventListener("pointerdown",e=>{if(!predict||predict.revealed)return;drawingP=true;chart.setPointerCapture(e.pointerId);prevPt=null;addGuess(e);});
+chart.addEventListener("pointermove",e=>{if(drawingP)addGuess(e);});chart.addEventListener("pointerup",()=>drawingP=false);
+function addGuess(e){const p=chartPoint(e);const last=cur.start+cur.vals.length-1;if(p.y<predict.cut||p.y>last){prevPt=null;return;}
+  if(prevPt&&prevPt.y!==p.y){const a=Math.min(prevPt.y,p.y),b=Math.max(prevPt.y,p.y);for(let y=a;y<=b;y++)predict.guess[y]=prevPt.v+(p.v-prevPt.v)*(y-prevPt.y)/(p.y-prevPt.y);}else predict.guess[p.y]=p.v;
+  prevPt=p;const filled=Object.keys(predict.guess).length,need=last-predict.cut+1;$("#revealBtn").disabled=filled<need*.6;$("#score").textContent=filled<need*.6?`Keep drawing: ${filled} of ${need} years.`:"Ready when you are.";drawChart(null,null);}
+$("#revealBtn").onclick=()=>{const c=cur,last=c.start+c.vals.length-1;predict.revealed=true;let err=0,k=0;
+  for(let y=predict.cut;y<=last;y++){const g=predict.guess[y],v=c.vals[y-c.start];if(g!=null&&v!=null){err+=Math.abs(g-v);k++;}}
+  const v=c.vals.filter(x=>x!=null);const span=Math.max(...v)-Math.min(...v);const acc=Math.max(0,Math.round(100-(err/k)/span*250));
+  const rank=acc>=85?"Chief inspector":acc>=65?"Senior detective":acc>=40?"Rookie with promise":"The data surprised you";
+  $("#revealBtn").hidden=true;$("#predictBtn").hidden=false;$("#predictBtn").textContent="✎ Predict again";renderCase();$("#score").innerHTML=`Your call was <b>${acc}%</b> on target. ${rank}.`;};
+$("#win").addEventListener("input",e=>{if(predict&&!predict.revealed)return;predict=null;winFrom=+e.target.value;renderCase();});
+function stopAudio(){if(audioCtx){try{audioCtx.close();}catch(_){}audioCtx=null;}if(playhead)playhead.setAttribute("opacity",0);$("#listenBtn").textContent="♪ Listen";}
+$("#listenBtn").onclick=()=>{if(audioCtx){stopAudio();return;}const AC=window.AudioContext||window.webkitAudioContext;if(!AC){$("#score").textContent="This browser cannot play generated sound.";return;}
+  audioCtx=new AC();const ctx=audioCtx,c=cur;const showFrom=c.id==="temp"?1950:c.start;const v=c.vals.slice(showFrom-c.start);const nn=v.filter(x=>x!=null),mn=Math.min(...nn),mx=Math.max(...nn);
+  const dur=6,stp=dur/v.length,t0=ctx.currentTime+.08;const o=ctx.createOscillator(),g=ctx.createGain();o.type="triangle";g.gain.setValueAtTime(0,ctx.currentTime);
+  v.forEach((x,i)=>{const t=t0+i*stp;if(x==null){g.gain.setValueAtTime(0,t);return;}g.gain.setValueAtTime(.16,t);o.frequency.setValueAtTime(196*Math.pow(4,(x-mn)/(mx-mn)),t);});
+  g.gain.setValueAtTime(.16,t0+dur-.05);g.gain.linearRampToValueAtTime(0,t0+dur+.15);o.connect(g).connect(ctx.destination);o.start(t0);o.stop(t0+dur+.2);
+  const st=stats(c.start,c.vals,winFrom);if(st&&st.toe){const tt=t0+(st.toe-showFrom)*stp;const b=ctx.createOscillator(),bg=ctx.createGain();b.frequency.value=1320;bg.gain.setValueAtTime(0,tt);bg.gain.linearRampToValueAtTime(.12,tt+.01);bg.gain.exponentialRampToValueAtTime(.001,tt+.35);b.connect(bg).connect(ctx.destination);b.start(tt);b.stop(tt+.4);}
+  $("#listenBtn").textContent="■ Stop";$("#score").textContent="Pitch rises with the value. Silence means missing data. The bell rings when the signal leaves the noise.";
+  const start=performance.now()+80,last=c.start+c.vals.length-1;const tick=()=>{if(!audioCtx||ctx!==audioCtx)return;const f=(performance.now()-start)/1000/dur;if(f>1.05){stopAudio();return;}if(f>=0&&playhead){const y=showFrom+f*(last-showFrom);playhead.setAttribute("x1",chart._X(y));playhead.setAttribute("x2",chart._X(y));playhead.setAttribute("opacity",.8);}requestAnimationFrame(tick);};requestAnimationFrame(tick);};
+
+/* =========== STEP 3: LAB =========== */
+const synth=(a,b,f,noise,seed)=>{const r=rng(seed);return range(a,b).map((y,i)=>+(f(i,y)+gauss(r)*noise).toFixed(3));};
+const rebase=a=>a.map(v=>v-a[0]);
+const ANT=range(1979,2025).map((y,i)=>{const late={2015:11.6,2016:11.1,2017:10.75,2018:10.8,2019:11.0,2020:11.25,2021:11.15,2022:10.7,2023:10.1,2024:10.35,2025:10.55};return late[y]!=null?late[y]:+(11.45+.017*(y-1979)+(rng(91+i)()-.5)*.32).toFixed(2);});
+const TWINS=[
+ {title:"Melting ice moves the sea in opposite directions",driver:"Land ice is melting",
+  note:"Near Juneau the crust rebounds as glaciers thin, faster than the sea rises, so the local sea falls. On the Louisiana coast the land sinks while meltwater raises the ocean, so the sea climbs fast. Average them and both stories vanish.",
+  a:{name:"Juneau, Alaska",sub:"relative sea level, mm",start:1980,vals:rebase(synth(1980,2025,t=>-13*t,22,21)),per:"mm / yr",scale:1,dig:1},
+  b:{name:"Grand Isle, Louisiana",sub:"relative sea level, mm",start:1980,vals:rebase(synth(1980,2025,t=>9.2*t,26,23)),per:"mm / yr",scale:1,dig:1}},
+ {title:"Warming greens one forest and browns its neighbour",driver:"Summers are getting warmer",
+  note:"On the cold North Slope a longer growing season lets shrubs spread, so satellites see greening. Farther south the same heat dries boreal spruce, and drought and fire make that forest browner.",
+  a:{name:"North Slope tundra",sub:"peak-summer NDVI",start:2000,vals:synth(2000,2025,t=>.55+.0036*t,.012,31),per:"NDVI / yr",scale:1,dig:4},
+  b:{name:"Interior Alaska forest",sub:"peak-summer NDVI",start:2000,vals:synth(2000,2025,t=>.78-.0023*t,.012,33),per:"NDVI / yr",scale:1,dig:4}},
+ {title:"Two poles, two answers, and a plot twist",driver:"A warming climate system",flip:true,
+  note:"For 35 years Antarctic sea ice grew slightly while the Arctic shrank, mostly because stronger winds spread the southern ice out. Then it dropped sharply after 2015. Slide the end year and watch the Antarctic verdict flip.",
+  a:{name:"Arctic, September",sub:"million km² (real NSIDC)",start:1979,vals:ICE,per:"M km² / decade",scale:10,dig:2},
+  b:{name:"Antarctic, annual mean",sub:"million km²",start:1979,vals:ANT,per:"M km² / decade",scale:10,dig:2}}];
+function miniChart(svg,s,to){svg.innerHTML="";const w=320,h=140,m={l:6,r:6,t:8,b:18};const last=s.start+s.vals.length-1;const v=s.vals.filter(x=>x!=null);let lo=Math.min(...v),hi=Math.max(...v);const pad=(hi-lo)*.1;lo-=pad;hi+=pad;
+  const X=y=>m.l+(y-s.start)/(last-s.start)*(w-m.l-m.r),Y=x=>m.t+(hi-x)/(hi-lo)*(h-m.t-m.b);
+  el("line",{x1:m.l,x2:w-m.r,y1:h-m.b,y2:h-m.b,stroke:COL.line},svg);[s.start,last].forEach((y,i)=>{const t=el("text",{x:i?w-m.r:m.l,y:h-4,"text-anchor":i?"end":"start","font-size":10.5,fill:COL.muted,"font-family":"IBM Plex Mono, monospace"},svg);t.textContent=y;});
+  if(to<last)el("rect",{x:X(to),y:m.t,width:w-m.r-X(to),height:h-m.t-m.b,fill:COL.muted,"fill-opacity":.1},svg);
+  let d="";s.vals.forEach((x,i)=>{if(x==null)return;d+=(d?"L":"M")+X(s.start+i).toFixed(1)+" "+Y(x).toFixed(1);});el("path",{d,fill:"none",stroke:COL.ink,"stroke-width":1.3,"stroke-opacity":.7},svg);
+  const st=stats(s.start,s.vals,s.start,to);if(st)el("line",{x1:X(st.from),y1:Y(st.fit(st.from)),x2:X(st.to),y2:Y(st.fit(st.to)),stroke:COL.heat,"stroke-width":2.6},svg);return st;}
+function renderTwins(){const box=$("#twins");box.innerHTML="";TWINS.forEach((t,ti)=>{const w=document.createElement("div");w.style.cssText="display:flex;flex-direction:column;gap:10px";
+  const card=(s,k)=>`<div class="twin-card"><div class="t"><b>${s.name}</b><span class="rate" id="tr${ti}${k}"></span></div><span class="label">${s.sub}</span><svg viewBox="0 0 320 140" id="ts${ti}${k}" role="img" aria-label="${s.name} trend"></svg></div>`;
+  w.innerHTML=`<h4 style="font-size:20px">${t.title}</h4><p class="driver">Shared driver: <b>${t.driver}</b></p><div class="twin">${card(t.a,"a")}${card(t.b,"b")}</div>${t.flip?`<div class="flip"><label for="flip${ti}">End the record in <b class="mono" id="fy${ti}">2025</b></label><input type="range" id="flip${ti}" min="1995" max="2025" value="2025"></div>`:""}<p class="hint">${t.note}</p>`;box.appendChild(w);
+  const upd=to=>["a","b"].forEach(k=>{const s=t[k];const st=miniChart(document.getElementById("ts"+ti+k),s,to);const r=document.getElementById("tr"+ti+k);if(st){r.textContent=`${st.sen>0?"▲":"▼"} ${fmt(st.sen*s.scale,s.dig)} ${s.per}`;r.style.color=st.p<.05?(st.sen>0?COL.heat:COL.cool):COL.muted;}});
+  upd(2025);if(t.flip){const inp=document.getElementById("flip"+ti);inp.addEventListener("input",()=>{document.getElementById("fy"+ti).textContent=inp.value;upd(+inp.value);});}});}
+const CLUES=[{id:"co2",name:"CO₂ rising",sub:"Mauna Loa",arrow:"▲"},{id:"temp",name:"Air & ocean warming",sub:"GISTEMP",arrow:"▲"},{id:"ice",name:"Arctic sea ice shrinking",sub:"NSIDC",arrow:"▼"},{id:"gl",name:"Greenland losing ice",sub:"GRACE-FO",arrow:"▼"},{id:"sea",name:"Sea level rising",sub:"Sentinel-6",arrow:"▲"},{id:"coast",name:"Salt water creeping into coastal farms",sub:"deltas worldwide",arrow:"▲"}];
+const LINKS={"co2>temp":"CO₂ absorbs the heat Earth radiates to space, so more of it means a warmer surface.","temp>ice":"Warmer air in summer and warmer water from below both melt sea ice.","ice>temp":"A feedback loop. White ice reflects sunlight; dark open water absorbs it, warming the Arctic and melting more ice.","temp>gl":"Warmer summers melt the ice sheet surface, and warmer ocean water eats at glacier fronts.","gl>sea":"Greenland's ice sits on land, so its meltwater adds to the ocean.","temp>sea":"Seawater expands as it warms. That expansion is a large share of the rise since 1993.","sea>coast":"Higher seas push salt water into rivers, soils and aquifers, especially where deltas are sinking."};
+const TRAPS={"ice>sea":"The trap. Sea ice already floats, so melting it barely changes sea level. That's why Greenland's land ice is the one that counts.","temp>co2":"Not the main story. Warming can release some carbon, but today's CO₂ rise carries the fingerprint of fossil fuels.","sea>temp":"Backwards. Sea level responds to warming; it doesn't cause it.","gl>temp":"Mostly backwards. Greenland reacts to warming; it isn't the global driver."};
+let found=new Set(),sel=null;
+function renderBoard(){const b=$("#board");b.querySelectorAll(".clue").forEach(n=>n.remove());CLUES.forEach(c=>{const btn=document.createElement("button");btn.className="clue";btn.id="clue-"+c.id;btn.setAttribute("aria-pressed","false");btn.innerHTML=`<span class="arrow" style="color:${c.arrow==="▲"?COL.heat:COL.cool}">${c.arrow}</span><b>${c.name}</b><small>${c.sub}</small>`;btn.onclick=()=>pickClue(c.id);b.appendChild(btn);});drawStrings();}
+function pickClue(id){if(!sel){sel=id;$("#clue-"+id).setAttribute("aria-pressed","true");$("#pick").textContent="Now tap what it drives.";return;}
+  $("#clue-"+sel).setAttribute("aria-pressed","false");if(sel===id){sel=null;$("#pick").textContent="Tap the clue that does the driving, then the clue it drives.";return;}
+  const key=sel+">"+id,nm=x=>CLUES.find(c=>c.id===x).name;const div=document.createElement("div");
+  if(LINKS[key]){const fresh=!found.has(key);found.add(key);div.className="ok";div.innerHTML=`<b>${fresh?"Pinned":"Already pinned"}: ${nm(sel)} → ${nm(id)}</b>${LINKS[key]}`;}
+  else{div.className="no";div.innerHTML=`<b>No link: ${nm(sel)} → ${nm(id)}</b>${TRAPS[key]||"The evidence doesn't support a direct link. Look for a physical mechanism that connects them."}`;}
+  $("#log").prepend(div);sel=null;$("#linkCount").textContent=found.size;$("#pick").textContent=found.size===7?"Case closed. Every causal thread is pinned, including the ice–temperature feedback loop.":"Tap the clue that does the driving, then the clue it drives.";drawStrings();}
+function drawStrings(){const s=$("#strings"),b=$("#board");if(!s||!b.offsetParent)return;s.innerHTML="";const br=b.getBoundingClientRect();
+  const defs=el("defs",{},s);const mk=el("marker",{id:"arr",viewBox:"0 0 10 10",refX:9,refY:5,markerWidth:7,markerHeight:7,orient:"auto-start-reverse"},defs);el("path",{d:"M0 0 L10 5 L0 10 z",fill:COL.heat},mk);
+  found.forEach(k=>{const[a,z]=k.split(">");const ra=$("#clue-"+a).getBoundingClientRect(),rz=$("#clue-"+z).getBoundingClientRect();
+    const ax=ra.left+ra.width/2-br.left,ay=ra.top+ra.height/2-br.top,zx=rz.left+rz.width/2-br.left,zy=rz.top+rz.height/2-br.top;const loop=found.has(z+">"+a)?(a<z?1:-1):0;
+    const mx=(ax+zx)/2+loop*30,my=(ay+zy)/2+26+loop*10;const dx=zx-mx,dy=zy-my,len=Math.hypot(dx,dy)||1,pad=Math.min(rz.width,rz.height)/2.2;
+    el("path",{d:`M${ax} ${ay} Q${mx} ${my} ${zx-dx/len*pad} ${zy-dy/len*pad}`,fill:"none",stroke:COL.heat,"stroke-width":2,"marker-end":"url(#arr)"},s);el("circle",{cx:ax,cy:ay,r:4,fill:COL.heat},s);});}
+$("#boardReset").onclick=()=>{found.clear();sel=null;$("#log").innerHTML="";$("#linkCount").textContent=0;renderBoard();};
+
+/* =========== STEP 4: SOURCES =========== */
+function renderSources(){const rows=[["Global temperature","NASA GISTEMP v4","https://data.giss.nasa.gov/gistemp/","real"],["Carbon dioxide","NOAA GML Mauna Loa","https://gml.noaa.gov/ccgg/trends/","real"],["Arctic sea ice","NSIDC Sea Ice Index","https://nsidc.org/data/seaice_index","real"],
+  ["Global sea level","NASA JPL 2025 sea level analysis","https://www.jpl.nasa.gov/news/nasa-analysis-shows-la-nina-limited-sea-level-rise-in-2025/","anch"],["Greenland mass","NASA GRACE / GRACE-FO","https://grace.jpl.nasa.gov/","est"],
+  ["Local temperature, rainfall, wind","NASA POWER API","https://power.larc.nasa.gov/","live"],["Satellite Earth image","NASA GIBS Blue Marble","https://www.earthdata.nasa.gov/data/tools/gibs","live"],["Country borders","Apache ECharts world map","https://echarts.apache.org/","real"],["Opposite twins","NOAA tide gauges, NASA MODIS","https://tidesandcurrents.noaa.gov/sltrends/","est"]];
+  $("#srcRows").innerHTML=rows.map(([a,b,u,s])=>`<tr><td>${a}</td><td><a href="${u}" target="_blank" rel="noopener">${b}</a></td><td>${s==="live"?'<span class="badge live">Live when deployed</span>':BADGE[s]}</td></tr>`).join("");}
+
+/* =========== NAVIGATION =========== */
+const ORDER=["place","planet","lab","data"];
+function goStep(s){step=s;ORDER.forEach(k=>$("#p-"+k).hidden=k!==s);$$(".steps button").forEach(b=>{const i=ORDER.indexOf(b.dataset.step);b.toggleAttribute("aria-current",false);if(b.dataset.step===s)b.setAttribute("aria-current","step");b.classList.toggle("done",i<ORDER.indexOf(s));});
+  $("#console").classList.toggle("wide",s==="lab"||s==="data");
+  if(s==="place"){renderPlace();if(place){setMarker(place.lat,place.lon);flyTo(place.lat,place.lon,mapOK?2.25:2.8);}}
+  if(s==="planet"){renderCaseTabs();renderCase();if(glOK){setMarker(cur.lat,cur.lon);flyTo(cur.lat,cur.lon,3.2);}}
+  if(s==="lab"){renderTwins();requestAnimationFrame(drawStrings);}
+  if(glOK)requestAnimationFrame(resize);window.scrollTo({top:0,behavior:"smooth"});}
+$$(".steps button").forEach(b=>b.onclick=()=>goStep(b.dataset.step));$$("[data-goto]").forEach(b=>b.onclick=()=>goStep(b.dataset.goto));
+function renderWho(){$("#whoTxt").textContent=user.name?`${user.name}${place?" · "+place.name:""}`:"";}
+
+/* =========== ONBOARDING =========== */
+let pending=null;
+function showS(n){[1,2,3].forEach(i=>{$("#s"+i).hidden=i!==n;$("#d"+i).classList.toggle("on",i<=n);});setTimeout(()=>{const f={1:"#nameIn",2:"#placeIn",3:"#birthIn"}[n];$(f).focus();},30);}
+function openOnb(){$("#onb").hidden=false;$("#nameIn").value=user.name||"";$("#birthIn").value=user.birth||"";pending=place;$("#placeIn").value=place?place.name:"";$("#go2").disabled=!pending;renderSugg("");showS(1);}
+/* Next on the name step is wired by the small early script, so it works even if anything here fails. */
+const readName=()=>{user.name=($("#nameIn").value||"").trim().slice(0,30)||window.__ecbName||"Detective";};
+$("#nameIn").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();$("#go1").click();}});
+$("#back2").onclick=()=>showS(1);$("#back3").onclick=()=>showS(2);
+function setPending(c){pending=c;$("#placeIn").value=c.name;$("#go2").disabled=false;$("#sugg").innerHTML="";$$("#quick button").forEach(b=>b.setAttribute("aria-pressed",b.textContent===c.name));}
+function renderSugg(q){const box=$("#sugg");box.innerHTML="";if(!q)return;const ql=q.toLowerCase();COUNTRIES.filter(c=>c.name.toLowerCase().includes(ql)).sort((a,b)=>a.name.toLowerCase().indexOf(ql)-b.name.toLowerCase().indexOf(ql)).slice(0,8).forEach(c=>{const b=document.createElement("button");b.setAttribute("role","option");b.textContent=c.name;b.onclick=()=>setPending(c);box.appendChild(b);});
+  if(!box.children.length){const p=document.createElement("p");p.className="hint";p.style.padding="6px 10px";p.textContent="No country matches that. Try another spelling.";box.appendChild(p);}}
+$("#placeIn").addEventListener("input",e=>{pending=null;$("#go2").disabled=true;renderSugg(e.target.value.trim());});
+$("#placeIn").addEventListener("keydown",e=>{if(e.key==="Enter"){const f=$("#sugg button");if(f)f.click();}});
+const QUICK=["Egypt","United States","India","Brazil","Germany","Japan","Nigeria","Australia"];
+QUICK.forEach(n=>{const c=COUNTRIES.find(q=>q.name===n);if(!c)return;const b=document.createElement("button");b.textContent=n;b.setAttribute("aria-pressed","false");b.onclick=()=>setPending(c);$("#quick").appendChild(b);});
+$("#go2").onclick=()=>{if(pending)showS(3);};
+$("#go3").onclick=()=>{readName();const v=$("#birthIn").value.trim();if(v&&(!(+v>=1930&&+v<=2022))){$("#birthErr").hidden=false;return;}$("#birthErr").hidden=true;user.birth=v?+v:null;store.set("user",user);$("#onb").hidden=true;choosePlace(pending,false);goStep("place");};
+$("#birthIn").addEventListener("keydown",e=>{if(e.key==="Enter")$("#go3").click();});
+$("#editMe").onclick=openOnb;
+
+/* =========== BOOT =========== */
+const safe=(fn,label)=>{try{return fn();}catch(e){console.warn(label,e);}};
+safe(()=>paintBase(null),"base");safe(paintTexture,"texture");
+safe(()=>{try{initGL();}catch(e){glOK=false;throw e;}},"3d");
+if(!glOK){$("#imgBadge").textContent="Flat map · 3D unavailable here";$(".zoom").hidden=true;drawFlat();new ResizeObserver(drawFlat).observe(stage);
+  stage.addEventListener("click",e=>{const r=stage.getBoundingClientRect();const w=r.width,h=w/2,y0=(r.height-h)/2;const lon=(e.clientX-r.left)/w*360-180,lat=90-(e.clientY-r.top-y0)/h*180;
+    const c=countryAt(lat,lon);if(c)choosePlace(c,true);});}
+else{$("#imgBadge").textContent=mapOK?"Drawn Earth · real borders":"Drawn Earth";
+  const img=new Image();img.crossOrigin="anonymous";
+  img.onload=()=>{paintBase(img);paintTexture();$("#imgBadge").textContent="NASA Blue Marble · live";$("#imgBadge").style.color=COL.cool;};
+  img.src="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=BlueMarble_ShadedRelief_Bathymetry&STYLES=&CRS=EPSG:4326&BBOX=-90,-180,90,180&WIDTH="+TW+"&HEIGHT="+TH+"&FORMAT=image/jpeg";}
+new ResizeObserver(()=>{resize();drawStrings();}).observe(stage);
+new ResizeObserver(()=>drawStrings()).observe($("#board"));
+safe(updateLegend,"legend");safe(renderBoard,"board");safe(renderSources,"sources");safe(()=>selectCase(0),"cases");
+const saved=user.place&&COUNTRIES.find(c=>c.name===user.place);
+if(saved&&user.name){$("#onb").hidden=true;choosePlace(saved,false);goStep("place");}
+else{openOnb();goStep("place");}
+})();
+</script>
